@@ -1343,6 +1343,15 @@ async function saveResult(){
   const name='旅遊影片-'+(tripDays()[0]||ymdOf(new Date()))+'.'+(resultType.includes('mp4')?'mp4':'webm');
   if(dl){try{await dl.save({filename:name,data:resultBlob});setStatus('#saveStatus','已存檔：'+name);}
     catch(e){setStatus('#saveStatus',e&&e.code==='declined'?'已取消存檔。':(e&&e.code==='rate_limited'?'存檔視窗已開啟，請先處理它。':'這裡無法存檔，可以長按上方影片儲存。'),e&&e.code!=='declined');}return;}
+  const cap=window.Capacitor;
+  if(cap&&cap.isNativePlatform&&cap.isNativePlatform()&&cap.Plugins&&cap.Plugins.Filesystem&&cap.Plugins.Share){
+    try{setStatus('#saveStatus','準備影片中…');
+      const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(resultBlob);});
+      const f=await cap.Plugins.Filesystem.writeFile({path:name,data:b64,directory:'CACHE'});
+      await cap.Plugins.Share.share({title:'旅遊影片',files:[f.uri]});
+      setStatus('#saveStatus','已開啟分享選單，選「儲存影片」就會存進相簿。');}
+    catch(e){setStatus('#saveStatus',/cancel/i.test(String(e&&e.message||e))?'已取消。':'無法存檔：'+(e&&e.message||'不明原因'),!/cancel/i.test(String(e&&e.message||e)));}
+    return;}
   if(!window.claude){
     try{const file=new File([resultBlob],name,{type:resultType||'video/mp4'});
       if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'旅遊影片'});setStatus('#saveStatus','已開啟分享選單，選「儲存影片」就會存進相簿。');return;}}
@@ -1602,6 +1611,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(S.step
 <script>
 (function(){
   if('serviceWorker' in navigator&&location.protocol==='https:'){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+  if(window.Capacitor)return;
   const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
   if(standalone)return;
   let dismissed=false;try{dismissed=localStorage.getItem('tv_install_x')==='1';}catch(e){}

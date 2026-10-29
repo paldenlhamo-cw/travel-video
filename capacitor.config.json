@@ -1,0 +1,9 @@
+{
+  "appId": "com.paldenlhamo.travelvideo",
+  "appName": "旅遊影片",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#F3F4F1"
+  }
+}

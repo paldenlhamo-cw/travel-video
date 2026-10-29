@@ -1,0 +1,19 @@
+{
+  "name": "travel-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "旅遊影片剪輯 iPhone App（Capacitor 包裝同一份網頁程式）",
+  "scripts": {
+    "www": "bash scripts/prepare-www.sh"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/share": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/assets": "^3.0.5"
+  }
+}
