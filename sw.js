@@ -1,5 +1,5 @@
 /* 旅遊影片剪輯：離線快取。更新 index.html 後，把下面的版本號加 1，手機上的 App 就會換成新版。 */
-const VERSION = 'tv-v1';
+const VERSION = 'tv-v2';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './favicon.png'];
 const RUNTIME_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net'];
 
@@ -14,6 +14,8 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   // The page itself: try the network first so updates show up, fall back to the saved copy offline.
+  // Other apps in sub-folders (e.g. photo-vlog/) manage themselves; leave their pages alone.
+  if (url.origin === location.origin && url.pathname.startsWith(new URL('./photo-vlog/', self.registration.scope).pathname)) return;
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put('./index.html', copy)); return res; })
       .catch(() => caches.match('./index.html')));
