@@ -1,0 +1,1620 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#C2410C">
+<meta name="description" content="選取旅途中拍的影片，自動加上地點、時間、天氣、心情和足跡地圖，剪成一部影片。">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="旅遊影片">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}
+#installTip{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:20;background:var(--surface,#fff);color:var(--ink,#1B2430);border:1px solid var(--line,#DDE1E5);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px 14px 14px 16px;display:flex;gap:12px;align-items:center;font-size:14px;line-height:1.5;max-width:528px;margin:0 auto}
+#installTip img{width:44px;height:44px;border-radius:10px;flex-shrink:0}
+#installTip p{margin:0;flex:1;min-width:0}
+#installTip button{min-height:40px;border-radius:20px;border:none;padding:0 14px;font:inherit;font-weight:700;cursor:pointer}
+#installTip .go{background:var(--accent,#C2410C);color:var(--accent-ink,#fff)}
+#installTip .x{background:transparent;color:var(--muted,#566170);padding:0 8px}
+</style>
+</head>
+<body>
+<title>旅遊影片剪輯</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Iansui&display=swap">
+<style>
+/* Layout: one-column phone app, step tabs on top, sticky action bar at the bottom */
+:root{
+  --bg:#F3F4F1; --surface:#FFFFFF; --ink:#1B2430; --muted:#566170; --line:#DDE1E5;
+  --chip:#E9ECEE; --accent:#C2410C; --accent-ink:#FFFFFF; --accent-soft:#FBECE3;
+  --teal:#0F766E; --teal-soft:#E0F0EC;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --serif:"Noto Serif TC","Songti TC","PMingLiU",serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171D; --surface:#1B222A; --ink:#EDF0F3; --muted:#A3ADB9; --line:#2D3640;
+  --chip:#252E38; --accent:#F07A3E; --accent-ink:#1C0F07; --accent-soft:#3A2419;
+  --teal:#44B9AA; --teal-soft:#173430; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171D; --surface:#1B222A; --ink:#EDF0F3; --muted:#A3ADB9; --line:#2D3640;
+  --chip:#252E38; --accent:#F07A3E; --accent-ink:#1C0F07; --accent-soft:#3A2419;
+  --teal:#44B9AA; --teal-soft:#173430; color-scheme:dark}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.app{max-width:560px;margin:0 auto;padding-block:16px 0;display:flex;flex-direction:column;gap:18px;min-height:100vh}
+.top{display:flex;align-items:center;gap:12px}
+.mark{width:44px;height:44px;border-radius:12px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.top h1{margin:0;font-family:var(--serif);font-size:22px;line-height:1.2;letter-spacing:.5px}
+.top p{margin:0;font-size:13px;color:var(--muted)}
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.steps button{border:none;background:transparent;display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:4px 0 2px;color:var(--muted);font:inherit;font-size:13px;cursor:pointer;min-height:44px;text-align:center}
+.steps button::before{content:"";display:block;height:4px;border-radius:2px;background:var(--line)}
+.steps button.done::before,.steps button[aria-current="step"]::before{background:var(--accent)}
+.steps button[aria-current="step"]{color:var(--ink);font-weight:700}
+main{display:flex;flex-direction:column}
+section{display:flex;flex-direction:column;gap:14px}
+h2{margin:0;font-family:var(--serif);font-size:26px;line-height:1.3;text-wrap:balance}
+.lead{margin:0;color:var(--muted)}
+.card{background:var(--surface);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h3{margin:0;font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{min-height:44px;padding:0 18px;border-radius:22px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.small{min-height:36px;padding:0 14px;font-size:14px}
+.btn:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.icon{width:44px;height:44px;border:none;background:transparent;color:var(--muted);border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:40px;padding:0 16px;border-radius:20px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.chip.person{background:var(--teal-soft);border-color:transparent;color:var(--ink)}
+.seg{display:flex;background:var(--chip);border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;min-height:40px;border:none;border-radius:9px;background:transparent;color:var(--ink);font:inherit;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+label.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0;flex:1}
+input[type=text],input[type=number],select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 12px;width:100%;box-sizing:border-box;min-width:0}
+textarea{padding:10px 12px;min-height:150px;resize:vertical;line-height:1.75}
+.clips{display:flex;flex-direction:column;gap:10px}
+.clip{display:grid;grid-template-columns:28px 60px minmax(0,1fr) 44px;gap:10px;align-items:center;background:var(--surface);border-radius:14px;padding:10px 8px 10px 4px;position:relative;touch-action:pan-y}
+.clip.dragging{z-index:3;box-shadow:0 10px 28px rgba(0,0,0,.22);transition:none}
+.clips.sorting .clip:not(.dragging){transition:transform .15s ease}
+.handle{width:28px;height:100px;border:none;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;border-radius:8px}
+.handle:active{cursor:grabbing}
+.thumb{position:relative}
+.order{position:absolute;left:-6px;top:-6px;min-width:26px;height:26px;border-radius:13px;background:var(--accent);color:var(--accent-ink);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;box-sizing:border-box;border:2px solid var(--surface);font-variant-numeric:tabular-nums}
+.ctrls{display:flex;flex-direction:column;gap:2px}
+.ctrls .icon{height:36px}
+.ctrls .icon:disabled{opacity:.3;cursor:default}
+.notefield{grid-column:1/-1;display:block;padding-left:38px}
+.notefield input{background:var(--bg)}
+.noterow{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;align-items:start}
+.noterow img{width:40px;height:60px;object-fit:cover;border-radius:6px;background:var(--chip);display:block}
+.noterow textarea{min-height:68px}
+.frame.editing{outline:3px solid var(--teal);outline-offset:3px}
+.frame.editing canvas{touch-action:none;cursor:pointer}
+.swatch{width:40px;height:40px;border-radius:20px;border:2px solid var(--line);cursor:pointer;padding:0}
+.swatch[aria-pressed="true"]{outline:3px solid var(--teal);outline-offset:2px}
+.colorpick{width:44px;height:40px;border:none;background:transparent;padding:0;cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--accent);min-height:36px}
+.chip.gone{text-decoration:line-through;color:var(--muted)}
+.nudge{display:grid;grid-template-columns:repeat(4,44px);gap:6px}
+.nudge .icon{background:var(--chip);border-radius:10px}
+.edsec{display:flex;flex-direction:column;gap:8px}
+.edsec h4{margin:0;font-size:14px;display:flex;justify-content:space-between;gap:8px}
+.lenpick{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-top:4px}
+.lenpick select{min-height:36px;width:auto;padding:0 8px;font-size:14px}
+.stylegrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.stylebtn{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:center;text-align:left;min-height:64px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;cursor:pointer}
+.stylebtn[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.stylebtn b{display:block;font-size:14px;line-height:1.3}
+.stylebtn small{display:block;font-size:12px;line-height:1.35;color:var(--muted)}
+.sw{width:30px;height:30px;border-radius:8px;position:relative;overflow:hidden}
+.sw i{position:absolute;right:0;bottom:0;width:15px;height:15px;border-top-left-radius:6px}
+@media (max-width:360px){.stylegrid{grid-template-columns:1fr}}
+.locfield{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.clip .locfield,.clip .locsrc{grid-column:1/-1;padding-left:38px}
+.locfield input{background:var(--bg)}
+.locsrc{font-size:12px;color:var(--muted);line-height:1.4}
+.locsrc.ok{color:var(--teal)}
+.placerow .stack{display:flex;flex-direction:column;gap:6px;min-width:0}
+details.gkey{border-top:1px solid var(--line);padding-top:10px}
+details.gkey summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:center}
+.listhead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.listhead h3{margin:0;font-size:15px}
+.clip img,.placerow img{width:60px;height:100px;object-fit:cover;border-radius:8px;background:var(--chip);display:block}
+.clip .info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.clip strong{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tag{font-size:12px;padding:1px 8px;border-radius:10px;background:var(--chip);color:var(--muted)}
+.tag.ok{background:var(--teal-soft);color:var(--teal);font-weight:500}
+.empty{background:var(--surface);border:1.5px dashed var(--line);border-radius:16px;padding:28px 16px;text-align:center;color:var(--muted)}
+.status{font-size:13px;color:var(--muted);margin:0;min-height:1.3em}
+.status.err{color:var(--accent)}
+.placerow{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;align-items:center}
+.placerow img{width:40px;height:60px;border-radius:6px}
+.placerow .meta{display:block}
+.dayrow{display:grid;grid-template-columns:56px minmax(0,1fr) 92px;gap:8px;align-items:center;font-variant-numeric:tabular-nums}
+.dayrow .d{font-weight:700;font-size:14px}
+.temp{position:relative}
+.temp input{padding-right:34px}
+.temp span{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
+.big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.frame{width:min(100%,300px);aspect-ratio:9/16;margin:0 auto;border-radius:20px;overflow:hidden;background:#000;max-width:100%}
+.frame canvas,.frame video{width:100%;height:100%;display:block;object-fit:contain;background:#000}
+.mapframe{width:100%;aspect-ratio:3/4;border-radius:16px;overflow:hidden;max-width:100%}
+.mapframe canvas{width:100%;height:100%;display:block}
+.progress{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.progress>div{height:100%;width:0;background:var(--accent);transition:width .2s linear}
+.note{font-size:13px;color:var(--muted);margin:0;background:var(--accent-soft);border-radius:12px;padding:10px 12px}
+.bar{position:sticky;bottom:0;display:flex;gap:10px;padding-block:12px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line);margin-top:auto;z-index:5}
+.bar .btn{flex:1}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#holder{position:fixed;left:0;top:0;width:2px;height:2px;overflow:hidden;opacity:.01;pointer-events:none}
+#holder video{width:2px;height:2px}
+@media (prefers-reduced-motion: reduce){.progress>div{transition:none}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="mark" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 9h18M7 5v4M12 5v4M17 5v4"></path><path d="M12 17.5s-3-2.6-3-4.6a3 3 0 0 1 6 0c0 2-3 4.6-3 4.6z"></path></svg>
+    </div>
+    <div>
+      <h1>旅遊影片剪輯</h1>
+      <p id="modeNote">目前載入的是範例影片</p>
+    </div>
+  </header>
+
+  <nav class="steps" id="steps" aria-label="步驟">
+    <button type="button" data-action="goto" data-step="1">影片</button>
+    <button type="button" data-action="goto" data-step="2">資訊</button>
+    <button type="button" data-action="goto" data-step="3">心情</button>
+    <button type="button" data-action="goto" data-step="4">足跡</button>
+    <button type="button" data-action="goto" data-step="5">剪輯</button>
+  </nav>
+
+  <main>
+    <section data-step="1">
+      <h2>選擇旅途影片</h2>
+      <p class="lead">挑選旅途中拍的影片，會依拍攝時間排序並讀出拍攝地點。每段影片會自動挑出最精彩的片段，字幕會避開人臉。</p>
+      <div class="card">
+        <h3>影片風格 <span class="meta" id="styleName"></span></h3>
+        <div class="stylegrid" id="styleGrid"></div>
+      </div>
+      <div class="card">
+        <h3>每段影片要剪幾秒</h3>
+        <div class="seg" id="lenSeg"></div>
+        <p class="status" id="lenStatus">會從每段影片裡挑出最精彩的這幾秒。上傳後，每段也可以個別調整。</p>
+      </div>
+      <div class="row">
+        <label class="btn primary" for="file">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          選擇影片
+        </label>
+        <input class="vh" type="file" id="file" accept="video/*" multiple>
+        <button class="btn" type="button" data-action="demo">改用範例</button>
+      </div>
+      <p class="status" id="pickStatus"></p>
+      <div class="listhead" id="listHead">
+        <h3>播放順序</h3>
+        <button class="btn small" type="button" data-action="sort-time" id="sortTimeBtn" hidden>改回依拍攝時間</button>
+      </div>
+      <p class="status" id="orderStatus" aria-live="polite">按住左邊的把手拖曳，或用箭頭調整前後順序。</p>
+      <div class="clips" id="clipList"></div>
+    </section>
+
+    <section data-step="2" hidden>
+      <h2>旅程資訊</h2>
+      <p class="lead">已從影片讀出時間和定位，點欄位即可修改。</p>
+      <div class="card">
+        <h3>旅遊時間</h3>
+        <div class="big" id="dateRange"></div>
+      </div>
+      <div class="card">
+        <h3>國家／城市
+          <button class="btn small" type="button" data-action="geo" id="geoBtn">全部自動填寫</button>
+        </h3>
+        <div class="row">
+          <label class="field">國家<input type="text" id="country" autocomplete="off"></label>
+          <label class="field">城市<input type="text" id="cities" autocomplete="off"></label>
+        </div>
+        <p class="status" id="geoStatus"></p>
+        <h3>每段影片的地點</h3>
+        <p class="status">可以自由填寫，或按「自動定位」依影片的定位資料自動填入。手動填寫的地點也會在足跡地圖上標出來。</p>
+        <div id="placeRows" class="clips"></div>
+        <details class="gkey">
+          <summary>使用 Google 地圖定位（選填）</summary>
+          <div class="edsec">
+            <label class="field">Google Maps API 金鑰<input type="text" id="gKey" autocomplete="off" spellcheck="false" placeholder="AIza…"></label>
+            <p class="status" id="gKeyStatus">填入金鑰後，「自動定位」會改用 Google 地圖查地名和景點。金鑰只會存在這台裝置的瀏覽器裡。在 Claude 的頁面中無法連到 Google，放到自己的網站（例如 GitHub）才會生效。</p>
+          </div>
+        </details>
+      </div>
+      <div class="card">
+        <h3>天氣
+          <button class="btn small" type="button" data-action="weather" id="wxBtn">自動查天氣</button>
+        </h3>
+        <div id="wxRows" class="clips"></div>
+        <p class="status" id="wxStatus"></p>
+      </div>
+    </section>
+
+    <section data-step="3" hidden>
+      <h2>這趟旅行的心情</h2>
+      <div class="card">
+        <h3>心情（可多選）</h3>
+        <div class="chips" id="moodChips"></div>
+      </div>
+      <div class="card">
+        <h3>與誰一起旅行</h3>
+        <div class="chips" id="compChips"></div>
+        <div class="row">
+          <label class="field"><span class="vh">旅伴名字</span><input type="text" id="compInput" placeholder="輸入名字，例如：媽媽" autocomplete="off"></label>
+          <button class="btn" type="button" data-action="comp-add">加入</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>影片風格</h3>
+        <p class="status" id="styleNote3"></p>
+      </div>
+      <div class="card">
+        <h3>每段影片的心情短文</h3>
+        <p class="status">每段寫一句，會顯示在那段影片下方。第 1 步上傳影片後也可以直接填寫。</p>
+        <div id="noteRows" class="clips"></div>
+        <div class="row">
+          <button class="btn small" type="button" data-action="ai-desc" id="aiDescBtn" hidden>AI 幫我寫</button>
+          <button class="btn small" type="button" data-action="tpl-desc">用範本產生</button>
+          <button class="btn small" type="button" data-action="stop-ai" id="stopAiBtn" hidden>停止</button>
+        </div>
+        <p class="status" id="descStatus">「AI 幫我寫」和「用範本產生」只會填入空白的欄位；全部都有內容時，會整批重寫。</p>
+      </div>
+    </section>
+
+    <section data-step="4" hidden>
+      <h2>足跡地圖</h2>
+      <p class="lead">依拍攝地點串成路線，放在影片結尾，約 8 秒。</p>
+      <div class="mapframe"><canvas id="mapCanvas" width="720" height="960" role="img" aria-label="足跡地圖動畫預覽"></canvas></div>
+      <p class="status" id="mapNote"></p>
+      <div class="card">
+        <h3>移動圖示</h3>
+        <div class="seg" id="moverSeg"></div>
+      </div>
+    </section>
+
+    <section data-step="5" hidden>
+      <h2>剪輯成一部影片</h2>
+      <p class="lead" id="lenNote"></p>
+      <div class="frame" id="outFrame"><canvas id="out" width="720" height="1280" role="img" aria-label="影片預覽"></canvas></div>
+      <div class="card" id="musicCard">
+        <h3>背景音樂 <span class="meta" id="musicNow"></span></h3>
+        <div class="seg" id="musicMode"></div>
+        <div id="mPreset" class="edsec" hidden>
+          <div class="chips" id="presetChips"></div>
+          <p class="status">內建配樂是即時合成的，可以放心使用，沒有版權問題。</p>
+        </div>
+        <div id="mGen" class="edsec" hidden>
+          <h4>氣氛</h4><div class="chips" id="genMood"></div>
+          <h4>樂器</h4><div class="chips" id="genInst"></div>
+          <h4>速度 <span id="genBpmVal"></span></h4>
+          <label><span class="vh">速度</span><input type="range" id="genBpm" min="64" max="140" step="2"></label>
+          <div class="row">
+            <button class="btn small" type="button" data-action="gen-new">換一首旋律</button>
+            <button class="btn small" type="button" data-action="gen-ai" id="genAiBtn" hidden>AI 依旅程作曲</button>
+          </div>
+          <p class="status" id="genStatus"></p>
+        </div>
+        <div id="mUpload" class="edsec" hidden>
+          <div class="row">
+            <label class="btn small" for="musicFile">選擇音樂檔</label>
+            <input class="vh" type="file" id="musicFile" accept="audio/*,.mp3,.m4a,.aac,.wav">
+            <span class="meta" id="musicFileName">尚未選擇</span>
+          </div>
+          <label class="field">從第幾秒開始<input type="number" id="musicOffset" min="0" step="1" value="0" inputmode="numeric"></label>
+          <p class="status" id="uploadStatus">音樂比影片短時會自動重複播放，結尾會自動淡出。請使用你有權使用的音樂。</p>
+        </div>
+        <div id="mVol" class="edsec">
+          <h4>音量 <span id="volVal"></span></h4>
+          <label><span class="vh">音量</span><input type="range" id="musicVol" min="0" max="100" step="5"></label>
+          <div class="row">
+            <button class="btn small" type="button" data-action="m-play" id="mPlayBtn">試聽</button>
+            <span class="status" id="mStatus" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+      <div class="progress" aria-hidden="true"><div id="prog"></div></div>
+      <div class="row">
+        <button class="btn" type="button" data-action="preview" id="previewBtn">播放預覽</button>
+        <button class="btn primary" type="button" data-action="render" id="renderBtn">產生影片</button>
+        <button class="btn" type="button" data-action="stop" id="stopBtn" hidden>停止</button>
+      </div>
+      <p class="status" id="renderStatus"></p>
+      <button class="btn" type="button" data-action="edit-toggle" id="editToggle" aria-pressed="false">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>
+        編輯影片上的文字
+      </button>
+      <div class="card" id="editPanel" hidden>
+        <div class="edsec">
+          <h4>要編輯的畫面</h4>
+          <div class="chips" id="segPick"></div>
+        </div>
+        <p class="status">點影片上的文字來選取，按住拖曳可以移動位置。</p>
+        <div class="edsec">
+          <h4>文字項目</h4>
+          <div class="chips" id="itemPick"></div>
+        </div>
+        <div id="itemEditor" class="edsec" hidden>
+          <label class="field">文字內容<textarea id="edText" rows="3"></textarea></label>
+          <p class="status" id="edHint"></p>
+          <h4>顏色</h4>
+          <div class="chips" id="edColors"></div>
+          <h4>大小 <span id="edSizeVal"></span></h4>
+          <label><span class="vh">文字大小</span><input type="range" id="edSize" min="50" max="200" step="5"></label>
+          <h4>字型</h4>
+          <div class="seg" id="edFont"></div>
+          <h4>位置</h4>
+          <div class="row">
+            <div class="nudge">
+              <button class="icon" type="button" data-action="nudge" data-dx="-12" data-dy="0" aria-label="往左移"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></button>
+              <button class="icon" type="button" data-action="nudge" data-dx="0" data-dy="-12" aria-label="往上移"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button>
+              <button class="icon" type="button" data-action="nudge" data-dx="0" data-dy="12" aria-label="往下移"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+              <button class="icon" type="button" data-action="nudge" data-dx="12" data-dy="0" aria-label="往右移"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+            </div>
+            <button class="btn small" type="button" data-action="ed-repos">重設位置</button>
+          </div>
+          <div class="row">
+            <button class="btn small" type="button" data-action="ed-hide" id="edHide">刪除這段文字</button>
+            <button class="btn small" type="button" data-action="ed-all" id="edAll">樣式套用到所有片段</button>
+            <button class="btn small" type="button" data-action="ed-reset">還原這段文字</button>
+          </div>
+          <p class="status" id="edStatus" aria-live="polite"></p>
+        </div>
+      </div>
+      <div class="card" id="resultCard" hidden>
+        <h3>完成的影片</h3>
+        <div class="frame"><video id="result" controls playsinline></video></div>
+        <button class="btn primary" type="button" data-action="save" id="saveBtn">存到裝置</button>
+        <p class="status" id="saveStatus"></p>
+      </div>
+      <p class="note">剪輯時請讓畫面保持開啟，背景音樂會一起錄進影片。iPhone 開啟靜音模式時，試聽可能沒有聲音。</p>
+    </section>
+  </main>
+
+  <div class="bar">
+    <button class="btn" type="button" data-action="prev" id="prevBtn">上一步</button>
+    <button class="btn primary" type="button" data-action="next" id="nextBtn">下一步</button>
+  </div>
+</div>
+<div id="holder" aria-hidden="true"></div>
+
+<script>
+(function(){
+const W=720,H=1280;
+const SANS='"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif';
+const SERIF='"Noto Serif TC","Songti TC","PMingLiU",serif';
+const MOODS=['開心','放鬆','興奮','感動','悠閒','冒險','浪漫','療癒'];
+const STYLES=['微電影','紀錄片','生活訪談','MG動畫','談式廣告','短影音社群','TikTok','品牌形象','搞笑娛樂','客戶見證','產品形象'];
+const CONDS=['晴','晴時多雲','多雲','陰','小雨','雨','陣雨','雷雨','雪','霧'];
+const MOVERS=[['walk','小人走路'],['car','汽車'],['plane','飛機']];
+const VSTYLE={
+  '微電影':{desc:'電影色調與上下黑邊，慢動作緩慢推近，淡出淡入轉場',filter:'contrast(1.1) saturate(.8) sepia(.08)',tint:['rgba(0,110,130,.22)','soft-light'],desat:.15,vignette:.5,grain:.07,bars:true,speed:.8,motion:'zoomIn',zoom:.08,trans:'fadeBlack',td:.9,tf:'serif',kicker:'一 部 旅 行 微 電 影',tone:'沉靜、有畫面感，像電影旁白',sw:['#1D3B44','#C9A074']},
+  '紀錄片':{desc:'自然低飽和色調，手持晃動感，直接切換',filter:'saturate(.78) contrast(1.06)',desat:.22,vignette:.25,grain:.04,speed:1,motion:'drift',trans:'cut',td:0,tf:'sans',kicker:'旅 行 紀 錄',tone:'客觀平實，像紀錄片旁白',sw:['#5B5E57','#A39E8F']},
+  '生活訪談':{desc:'溫暖明亮色調，輕微推近，柔和溶接轉場',filter:'brightness(1.06) saturate(1.05) sepia(.1)',tint:['rgba(255,170,90,.16)','soft-light'],vignette:.15,speed:1,motion:'zoomIn',zoom:.05,trans:'dissolve',td:.5,tf:'sans',kicker:'旅 途 中 的 對 話',tone:'像受訪時自然說出口的話，第一人稱',sw:['#E9A86B','#F6E3C8']},
+  'MG動畫':{desc:'鮮豔高飽和色彩，畫面平移，斜向劃接轉場',filter:'saturate(1.35) contrast(1.1)',speed:1,motion:'pan',trans:'wipe',td:.4,tf:'sans',kicker:'旅 行 故 事',tone:'簡短有節奏，像動態圖文標語',sw:['#3D5AFE','#FF5A36']},
+  '談式廣告':{desc:'明亮通透的廣告色調，穩定推近，溶接轉場',filter:'brightness(1.06) contrast(1.08) saturate(1.12)',tint:['rgba(255,230,200,.12)','soft-light'],vignette:.2,speed:.9,motion:'zoomIn',zoom:.07,trans:'dissolve',td:.45,tf:'sans',kicker:'這 一 趟 ， 值 得 出 發',tone:'像廣告文案，有吸引力、帶點對話感',sw:['#F2C9A0','#FFFFFF']},
+  '短影音社群':{desc:'鮮明暖色，片段中段跳切放大，白光閃切',filter:'saturate(1.2) brightness(1.05) contrast(1.05)',tint:['rgba(255,140,120,.1)','soft-light'],speed:1.1,motion:'punch',trans:'flash',td:.25,tf:'sans',kicker:'跟 著 我 去 旅 行',tone:'活潑口語，像 IG 貼文',sw:['#FF7A6B','#FFD8A8']},
+  'TikTok':{desc:'高對比強烈色調，快慢變速，晃動進場與故障轉場',filter:'contrast(1.22) saturate(1.3)',vignette:.3,speed:'ramp',motion:'shake',trans:'glitch',td:.25,tf:'sans',kicker:'POV：我 在 旅 行',tone:'超口語、有梗，像 TikTok 字幕',sw:['#111111','#25F4EE']},
+  '品牌形象':{desc:'乾淨明亮的低對比色調，慢動作緩慢拉遠，長溶接',filter:'brightness(1.08) contrast(.94) saturate(.88)',lift:.06,speed:.7,motion:'zoomOut',zoom:.1,trans:'dissolve',td:1,tf:'serif',kicker:'旅　程',tone:'精簡優雅，像品牌形象標語',sw:['#EDEAE3','#B8AFA0']},
+  '搞笑娛樂':{desc:'超飽和色彩，加速播放，彈跳縮放與甩鏡轉場',filter:'saturate(1.45) contrast(1.08) brightness(1.04)',speed:1.3,motion:'bounce',trans:'whip',td:.3,tf:'sans',kicker:'旅 行 大 爆 笑',tone:'搞笑誇張、有梗',sw:['#FFD23F','#FF4D8D']},
+  '客戶見證':{desc:'自然柔和暖色，畫面穩定，溫和溶接轉場',filter:'saturate(.95) brightness(1.03) sepia(.06)',tint:['rgba(255,200,150,.1)','soft-light'],vignette:.2,speed:1,motion:'zoomIn',zoom:.03,trans:'dissolve',td:.6,tf:'sans',kicker:'旅 人 真 心 推 薦',tone:'像真實的心得分享，第一人稱、真誠',sw:['#C79C7A','#EFE2D3']},
+  '產品形象':{desc:'清爽銳利的高清色調，水平平移，推移轉場',filter:'contrast(1.14) saturate(1.06) brightness(1.04)',speed:1,motion:'pan',trans:'push',td:.45,tf:'sans',kicker:'旅 行 精 選',tone:'簡潔有力，像產品介紹文案',sw:['#2F3A45','#E6ECF1']}
+};
+Object.values(VSTYLE).forEach(v=>{v.title=v.tf==='serif'?SERIF:SANS;});
+const FILTER_OK=(function(){try{const x=document.createElement('canvas').getContext('2d');return 'filter' in x;}catch(e){return false;}})();
+const DEMO_CLIPS=[
+  {place:'嵐山竹林',city:'京都',country:'日本',lat:35.0170,lon:135.6713,date:'2026-10-12',time:'10:20',motif:'bamboo',pal:['#DDEBD9','#9CC09F'],duration:14},
+  {place:'清水寺',city:'京都',country:'日本',lat:34.9949,lon:135.7850,date:'2026-10-13',time:'09:40',motif:'temple',pal:['#FCE3C4','#F2B184'],duration:11,faces:[{x:270/720,y:245/1280,w:180/720,h:190/1280}]},
+  {place:'伏見稻荷大社',city:'京都',country:'日本',lat:34.9671,lon:135.7727,date:'2026-10-14',time:'08:30',motif:'torii',pal:['#3A2A22','#7A5440'],duration:16},
+  {place:'錦市場',city:'京都',country:'日本',lat:35.0050,lon:135.7649,date:'2026-10-14',time:'15:10',motif:'market',pal:['#2E2420','#5A3E30'],duration:9},
+  {place:'大阪城',city:'大阪',country:'日本',lat:34.6873,lon:135.5262,date:'2026-10-15',time:'11:00',motif:'castle',pal:['#B9CCD8','#E3EBF0'],duration:13},
+  {place:'道頓堀',city:'大阪',country:'日本',lat:34.6687,lon:135.5013,date:'2026-10-16',time:'19:30',motif:'city',pal:['#121831','#2C2452'],duration:12}
+];
+const DEMO_WX={'2026-10-12':{cond:'晴',temp:23},'2026-10-13':{cond:'晴',temp:22},'2026-10-14':{cond:'多雲',temp:19},'2026-10-15':{cond:'小雨',temp:17},'2026-10-16':{cond:'晴',temp:21}};
+const DEMO_DESC='和媽媽、小美在秋天的京都，上午漫步嵐山竹林。清水寺的舞台上，整座城市在腳下展開。千本鳥居一路往山上延伸，走得腿痠也捨不得停。錦市場邊走邊吃，玉子燒還是熱的。小雨中的大阪城，護城河特別安靜。最後一晚在道頓堀的霓虹下，為這趟旅行乾杯。';
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=x=>1-Math.pow(1-clamp(x,0,1),3);
+const pad=n=>String(n).padStart(2,'0');
+let uid=0;
+
+const SEG=3;
+const LEN_OPTS=[2,3,4,5,6,8,10];
+const FACEAPI_URL='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js';
+const FACEAPI_MODELS='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/';
+const S={step:1,clips:[],isDemo:true,country:'',cities:'',weather:{},moods:[],companions:[],style:'微電影',mover:'walk',manual:false,segLen:3,music:{mode:'preset',preset:null,gen:{mood:'溫暖',inst:'piano',bpm:96,seed:1,ai:null},up:null,vol:70}};
+let sampleFn=null, dl=null;
+
+/* ---------- helpers ---------- */
+function ymdOf(dt){return dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());}
+function fmtSlash(d){return d?d.replace(/-/g,'/'):'';}
+function fmtMD(d){if(!d)return'';const p=d.split('-');return (+p[1])+'/'+(+p[2]);}
+function fmtDot(d){return d?d.replace(/-/g,'.'):'';}
+function fmtDur(s){if(!s||!isFinite(s))return'';s=Math.round(s);return Math.floor(s/60)+':'+pad(s%60);}
+function tripDays(){return [...new Set(S.clips.map(c=>c.date).filter(Boolean))].sort();}
+function dayCount(){const d=tripDays();if(!d.length)return 0;return Math.round((Date.parse(d[d.length-1])-Date.parse(d[0]))/864e5)+1;}
+function rangeText(sep){const d=tripDays();if(!d.length)return'';const a=d[0],b=d[d.length-1];
+  const f=sep==='.'?fmtDot:fmtSlash;if(a===b)return f(a);
+  return f(a)+' – '+(a.slice(0,4)===b.slice(0,4)?f(b).slice(5):f(b));}
+function placeTitle(){return [S.country,S.cities].filter(Boolean).join(' · ');}
+function compText(){return S.companions.length?'與 '+S.companions.join('、'):'';}
+function haversine(a,b){const R=6371,r=Math.PI/180;const dLa=(b.lat-a.lat)*r,dLo=(b.lon-a.lon)*r;
+  const x=Math.sin(dLa/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function rng(seed){let t=seed>>>0;return function(){t+=0x6D2B79F5;let r=Math.imul(t^t>>>15,1|t);r^=r+Math.imul(r^r>>>7,61|r);return((r^r>>>14)>>>0)/4294967296;};}
+function once(el,ev,ms){return new Promise(res=>{let done=false;const f=()=>{if(done)return;done=true;el.removeEventListener(ev,f);res(true);};el.addEventListener(ev,f);setTimeout(()=>{if(!done){done=true;el.removeEventListener(ev,f);res(false);}},ms);});}
+function setStatus(id,text,err){const el=$(id);if(!el)return;el.textContent=text||'';el.classList.toggle('err',!!err);}
+function rrect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function wrap(ctx,text,maxW,maxLines){const lines=[];let cur='';for(const ch of String(text)){const t=cur+ch;if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=ch.trim()?ch:'';}else cur=t;}if(cur)lines.push(cur);
+  if(maxLines&&lines.length>maxLines){const l=lines.slice(0,maxLines);l[maxLines-1]=l[maxLines-1].slice(0,-1)+'…';return l;}return lines;}
+
+/* ---------- metadata from iPhone videos ---------- */
+async function readMeta(file){
+  const out={lat:null,lon:null,date:null,time:null,ts:null};
+  let moov=null;
+  try{
+    let off=0;const size=file.size;
+    for(let g=0;off<size&&g<80;g++){
+      const hb=new DataView(await file.slice(off,Math.min(off+16,size)).arrayBuffer());
+      if(hb.byteLength<8)break;
+      let bs=hb.getUint32(0);
+      const type=String.fromCharCode(hb.getUint8(4),hb.getUint8(5),hb.getUint8(6),hb.getUint8(7));
+      if(bs===1&&hb.byteLength>=16)bs=hb.getUint32(8)*4294967296+hb.getUint32(12);
+      else if(bs===0)bs=size-off;
+      if(bs<8)break;
+      if(type==='moov'){if(bs<80*1024*1024)moov=new Uint8Array(await file.slice(off,off+bs).arrayBuffer());break;}
+      off+=bs;
+    }
+  }catch(e){}
+  const setDT=dt=>{out.date=ymdOf(dt);out.time=pad(dt.getHours())+':'+pad(dt.getMinutes());out.ts=dt.getTime();};
+  if(moov){
+    const txt=new TextDecoder('latin1').decode(moov);
+    const g=txt.match(/([+-]\d{2}\.\d{2,})([+-]\d{3}\.\d{2,})/);
+    if(g){const la=parseFloat(g[1]),lo=parseFloat(g[2]);if(Math.abs(la)<=90&&Math.abs(lo)<=180&&!(la===0&&lo===0)){out.lat=la;out.lon=lo;}}
+    const d=txt.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    if(d&&+d[1]>1990){out.date=d[1]+'-'+d[2]+'-'+d[3];out.time=d[4]+':'+d[5];out.ts=Date.parse(out.date+'T'+d[4]+':'+d[5]+':'+d[6]);}
+    else{const i=txt.indexOf('mvhd');
+      if(i>=0&&i+16<=moov.length){const dv=new DataView(moov.buffer,moov.byteOffset,moov.byteLength);
+        const secs=moov[i+4]===1?dv.getUint32(i+8)*4294967296+dv.getUint32(i+12):dv.getUint32(i+8);
+        if(secs>2082844800+631152000)setDT(new Date((secs-2082844800)*1000));}}
+  }
+  if(!out.ts)setDT(new Date(file.lastModified||Date.now()));
+  return out;
+}
+
+function coverDraw(ctx,src,sw,sh,w,h){if(!sw||!sh)return;const s=Math.max(w/sw,h/sh);const dw=sw*s,dh=sh*s;ctx.drawImage(src,(w-dw)/2,(h-dh)/2,dw,dh);}
+
+/* ---------- face detection: native FaceDetector, else face-api model, else Claude vision ---------- */
+let detector=null,detectorTried=false;
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.append(s);});}
+async function getDetector(){
+  if(detectorTried)return detector;detectorTried=true;
+  if('FaceDetector' in window){try{const fd=new window.FaceDetector({fastMode:true,maxDetectedFaces:10});const t=document.createElement('canvas');t.width=t.height=16;await fd.detect(t);
+    detector={kind:'native',detect:async cv=>(await fd.detect(cv)).map(f=>({x:f.boundingBox.x/cv.width,y:f.boundingBox.y/cv.height,w:f.boundingBox.width/cv.width,h:f.boundingBox.height/cv.height}))};return detector;}catch(e){}}
+  if(!window.claude){try{
+    if(!window.faceapi)await loadScript(FACEAPI_URL);
+    const fa=window.faceapi;await fa.nets.tinyFaceDetector.loadFromUri(FACEAPI_MODELS);
+    const opt=new fa.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:.45});
+    detector={kind:'faceapi',detect:async cv=>(await fa.detectAllFaces(cv,opt)).map(d=>({x:d.box.x/cv.width,y:d.box.y/cv.height,w:d.box.width/cv.width,h:d.box.height/cv.height}))};return detector;}catch(e){detector=null;}}
+  return detector;
+}
+function unionBoxes(list){const out=[];list.forEach(b=>{const hit=out.find(o=>!(b.x>o.x+o.w||b.x+b.w<o.x||b.y>o.y+o.h||b.y+b.h<o.y));
+  if(hit){const x=Math.min(hit.x,b.x),y=Math.min(hit.y,b.y);hit.w=Math.max(hit.x+hit.w,b.x+b.w)-x;hit.h=Math.max(hit.y+hit.h,b.y+b.h)-y;hit.x=x;hit.y=y;}else out.push(Object.assign({},b));});return out;}
+
+/* ---------- find the best N seconds in a clip ---------- */
+function pickWindow(c){
+  const len=c.segLen||S.segLen,dur=c.duration||len;c.segDur=Math.min(len,dur);
+  const sm=c.samples,step=c.step||.5;
+  if(!sm||!sm.length){c.hlStart=c.kind==='demo'?clamp(Math.round(dur*.4),0,Math.max(0,dur-c.segDur)):0;return;}
+  let best=0,bestScore=-1e9;
+  if(dur>c.segDur+.05){for(const s of sm){const st=Math.max(0,s.t-step/2);if(st+c.segDur>dur)break;
+    const win=sm.filter(q=>q.t>=st&&q.t<=st+c.segDur);if(!win.length)continue;const sc=win.reduce((a,q)=>a+q.score,0)/win.length;if(sc>bestScore){bestScore=sc;best=st;}}}
+  c.hlStart=Math.min(best,Math.max(0,dur-c.segDur));
+  if(c.faceFromSamples)c.faces=unionBoxes(sm.filter(q=>q.t>=c.hlStart-step/2&&q.t<=c.hlStart+c.segDur+step/2).flatMap(q=>q.faces));
+}
+function setAllLen(n){S.segLen=n;S.clips.forEach(c=>{c.segLen=n;pickWindow(c);});}
+async function seekTo(v,t){v.currentTime=t;await once(v,'seeked',4000);}
+async function analyzeClip(c,det){
+  const v=document.createElement('video');v.muted=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='auto';v.src=c.url;
+  $('#holder').append(v);
+  c.hlStart=0;c.segLen=c.segLen||S.segLen;c.segDur=c.segLen;c.faces=[];
+  try{
+    await once(v,'loadedmetadata',6000);
+    const dur=v.duration&&isFinite(v.duration)?v.duration:SEG;c.duration=dur;c.vw=v.videoWidth;c.vh=v.videoHeight;c.segDur=Math.min(c.segLen,dur);
+    const small=document.createElement('canvas');small.width=48;small.height=80;const sx=small.getContext('2d',{willReadFrequently:true});
+    const fcv=document.createElement('canvas');const fw=320;fcv.width=fw;fcv.height=Math.max(1,Math.round(fw*(c.vh||16)/(c.vw||9)));const fx=fcv.getContext('2d');
+    const step=Math.max(.5,dur/36);const samples=[];let prev=null;
+    for(let t=Math.min(.25,dur/2);t<dur-.05;t+=step){
+      await seekTo(v,t);
+      sx.drawImage(v,0,0,48,80);const px=sx.getImageData(0,0,48,80).data;const g=new Float32Array(48*80);let sum=0;
+      for(let i=0;i<g.length;i++){g[i]=(px[i*4]*3+px[i*4+1]*6+px[i*4+2])/10;sum+=g[i];}
+      const mean=sum/g.length;let vr=0,md=0;for(let i=0;i<g.length;i++){vr+=(g[i]-mean)**2;if(prev)md+=Math.abs(g[i]-prev[i]);}
+      const s={t,motion:prev?md/g.length:null,contrast:Math.sqrt(vr/g.length),bright:mean,faces:[]};
+      if(det){try{fx.drawImage(v,0,0,fcv.width,fcv.height);s.faces=(await det.detect(fcv)).filter(b=>b.w>.03);}catch(e){}}
+      samples.push(s);prev=g;
+    }
+    if(samples.length){
+      const ms=samples.map(s=>s.motion).filter(m=>m!=null).sort((a,b)=>a-b);const med=ms.length?ms[Math.floor(ms.length/2)]:0;
+      samples.forEach(s=>{if(s.motion==null)s.motion=med;});
+      const maxM=Math.max(1e-6,...samples.map(s=>s.motion)),maxC=Math.max(1e-6,...samples.map(s=>s.contrast));
+      samples.forEach(s=>{s.score=s.motion/maxM+.35*s.contrast/maxC+(s.faces.length?.6+.15*Math.min(s.faces.length,3):0)-(s.bright<35?.6:0)-(s.bright>235?.3:0);});
+      c.samples=samples.map(q=>({t:q.t,score:q.score,faces:q.faces}));c.step=step;c.faceFromSamples=!!det;
+      pickWindow(c);c.faceChecked=!!det;
+    }
+    await seekTo(v,c.hlStart+c.segDur/2);
+    const cv=document.createElement('canvas');cv.width=144;cv.height=240;const x=cv.getContext('2d');
+    x.fillStyle='#2A3038';x.fillRect(0,0,144,240);coverDraw(x,v,v.videoWidth,v.videoHeight,144,240);c.thumb=cv.toDataURL('image/jpeg',.75);
+    {const pc=document.createElement('canvas');pc.width=540;pc.height=960;const px=pc.getContext('2d');px.fillStyle='#111';px.fillRect(0,0,540,960);coverDraw(px,v,v.videoWidth,v.videoHeight,540,960);c.poster=pc.toDataURL('image/jpeg',.82);}
+    if(!det){const big=document.createElement('canvas');const bw=640;big.width=bw;big.height=Math.round(bw*(c.vh||16)/(c.vw||9));big.getContext('2d').drawImage(v,0,0,big.width,big.height);
+      c.hlBlob=await new Promise(r=>big.toBlob(r,'image/jpeg',.8));}
+  }catch(e){}
+  v.removeAttribute('src');v.load();v.remove();
+  if(c.thumb){c.thumbImg=new Image();c.thumbImg.src=c.thumb;}
+  if(c.poster){c.posterImg=new Image();c.posterImg.src=c.poster;}
+}
+async function claudeFaces(list){
+  if(!sampleFn||!list.length)return false;
+  const lim=await sampleFn.limits().catch(()=>null);if(!lim||!lim.images)return false;
+  const per=Math.max(1,Math.min(lim.images.maxCount||1,8));let okAny=false;
+  for(let i=0;i<list.length;i+=per){const batch=list.slice(i,i+per);
+    setStatus('#pickStatus','用 AI 辨識人臉位置中…（'+Math.min(i+per,list.length)+' / '+list.length+'）');
+    try{const r=await sampleFn.json('這裡有 '+batch.length+' 張影片畫面，依序編號。請找出每張畫面裡所有清楚可見的人臉，回傳每張臉的外框，座標用 0 到 1 的比例表示（x、y 為左上角，相對於圖片寬高）。只回傳 JSON 陣列，長度等於圖片數，每個元素是該圖的人臉陣列，例如 [[{"x":0.41,"y":0.22,"w":0.18,"h":0.14}],[]]。沒有人臉就回傳空陣列。',{images:batch.map(c=>c.hlBlob),modelTier:'default'});
+      if(Array.isArray(r)){batch.forEach((c,k)=>{const f=Array.isArray(r[k])?r[k]:[];c.faces=unionBoxes(f.map(b=>({x:clamp(+b.x||0,0,1),y:clamp(+b.y||0,0,1),w:clamp(+b.w||0,0,1),h:clamp(+b.h||0,0,1)})).filter(b=>b.w>.02&&b.h>.02));c.faceChecked=true;});okAny=true;}}
+    catch(e){if(e&&(e.code==='not_granted'||e.code==='sampling_disabled')){sampleFn=null;refreshCaps();}break;}}
+  return okAny;
+}
+function demoThumb(c){const cv=document.createElement('canvas');cv.width=144;cv.height=240;const x=cv.getContext('2d');x.scale(144/W,240/H);drawDemoScene(x,c,1.2);c.thumb=cv.toDataURL('image/jpeg',.8);}
+
+/* ---------- state changes ---------- */
+function loadDemo(){
+  S.clips.forEach(c=>{if(c.url)URL.revokeObjectURL(c.url);});
+  const demoNotes=DEMO_DESC.split(/(?<=。)/).map(x=>x.trim()).filter(Boolean);
+  S.clips=DEMO_CLIPS.map((d,di)=>{const c=Object.assign({},d,{id:++uid,kind:'demo',ts:Date.parse(d.date+'T'+d.time+':00'),hlStart:0,segLen:S.segLen,segDur:S.segLen,faces:(d.faces||[]).map(b=>Object.assign({},b)),faceChecked:true,vw:W,vh:H,note:demoNotes[di]||''});pickWindow(c);demoThumb(c);return c;});
+  Object.assign(S,{manual:false,isDemo:true,country:'日本',cities:'京都、大阪',weather:JSON.parse(JSON.stringify(DEMO_WX)),moods:['開心','放鬆'],companions:['媽媽','小美'],style:S.style||'微電影'});
+  setStatus('#pickStatus','');renderAll();
+}
+async function addFiles(files){
+  const list=[...files].filter(f=>(f.type||'').startsWith('video/')||/\.(mov|mp4|m4v)$/i.test(f.name));
+  if(!list.length){setStatus('#pickStatus','沒有可用的影片檔，請選擇 MOV 或 MP4 影片。',true);return;}
+  if(S.isDemo){S.clips=[];Object.assign(S,{manual:false,isDemo:false,country:'',cities:'',weather:{},moods:[],companions:[]});}
+  $('#file').disabled=true;
+  setStatus('#pickStatus','準備人臉辨識…');
+  const det=await getDetector();
+  let n=0;const added=[];
+  for(const f of list){
+    n++;setStatus('#pickStatus','分析第 '+n+' / '+list.length+' 段影片，尋找最精彩的 '+S.segLen+' 秒…');
+    const m=await readMeta(f);
+    const c={id:++uid,kind:'file',file:f,url:URL.createObjectURL(f),place:'',city:'',country:'',duration:0,thumb:null,lat:m.lat,lon:m.lon,date:m.date,time:m.time,ts:m.ts,note:''};
+    await analyzeClip(c,det);S.clips.push(c);added.push(c);
+  }
+  let faceMsg='';
+  if(det)faceMsg='已用'+(det.kind==='native'?'瀏覽器內建功能':'人臉辨識模型')+'找出人臉位置。';
+  else if(await claudeFaces(added.filter(c=>c.hlBlob)))faceMsg='已用 AI 找出人臉位置。';
+  else faceMsg='這裡無法辨識人臉，字幕會照原本位置擺放。';
+  added.forEach(c=>{delete c.hlBlob;});
+  $('#file').disabled=false;
+  if(S.manual){const keep=S.clips.filter(c=>!added.includes(c));added.sort((a,b)=>a.ts-b.ts);S.clips=keep.concat(added);}
+  else S.clips.sort((a,b)=>a.ts-b.ts);
+  const geo=S.clips.filter(c=>c.lat!=null).length;
+  setStatus('#pickStatus','已加入 '+list.length+' 段影片。'+faceMsg+(geo<S.clips.length?'有 '+(S.clips.length-geo)+' 段沒有定位資料，可以在下一步手動填地點。':''));
+  renderAll();
+}
+
+/* ---------- rendering the steps ---------- */
+function renderAll(){renderModeNote();renderStep1();renderStep2();renderStep3();renderStep4();renderStep5();renderNav();}
+function renderModeNote(){$('#modeNote').textContent=S.isDemo?'目前載入的是範例影片，選擇影片即可換成你的':(S.clips.length+' 段影片 · '+(rangeText('/')||'尚未選擇'));}
+function lenOptions(c){const d=c.duration||99;const opts=LEN_OPTS.filter(n=>n<d+.05);if(!opts.includes(c.segLen)&&c.segLen<d)opts.push(c.segLen);opts.sort((a,b)=>a-b);
+  const full=d<99&&!LEN_OPTS.includes(Math.round(d*10)/10);
+  return opts.map(n=>'<option value="'+n+'"'+(c.segLen===n?' selected':'')+'>'+n+' 秒</option>').join('')+(full||!opts.length?'<option value="'+d+'"'+(c.segLen>=d?' selected':'')+'>整段（'+fmtDur(d)+'）</option>':'');}
+function renderStyleGrid(){
+  $('#styleName').textContent=S.style;
+  $('#styleGrid').innerHTML=STYLES.map(k=>{const v=VSTYLE[k];return '<button type="button" class="stylebtn" data-action="style" data-v="'+k+'" aria-pressed="'+(S.style===k)+'"><span class="sw" style="background:'+v.sw[0]+'" aria-hidden="true"><i style="background:'+v.sw[1]+'"></i></span><span><b>'+k+'</b><small>'+v.desc+'</small></span></button>';}).join('');
+}
+function locSrcText(c){
+  const m={google:'由 Google 地圖依定位填入',ai:'由 AI 依影片定位填入',free:'由免費地名服務依定位填入',here:'依目前位置填入'}[c.placeSrc];
+  if(c.placeSrc==='manual')return '手動填寫'+(c.manualGeo?'，已在足跡地圖上找到這個地點':(c.lat!=null?'':'，正在地圖上找這個地點…'));
+  if(m)return m;
+  return c.lat!=null?'影片有定位資料，按「自動定位」可自動填入':'影片沒有定位資料，可以自由填寫或用目前位置';
+}
+function locField(c,i){
+  return '<div class="locfield"><label><span class="vh">第 '+(i+1)+' 段的地點</span><input type="text" data-place-id="'+c.id+'" value="'+esc(c.place||'')+'" placeholder="地點（可自由填寫）" autocomplete="off"></label><button class="btn small" type="button" data-action="loc-auto" data-id="'+c.id+'">'+(c.lat!=null&&!c.manualGeo?'自動定位':'用目前位置')+'</button></div><span class="locsrc'+(c.placeSrc&&c.placeSrc!=='manual'||c.manualGeo?' ok':'')+'" data-locsrc="'+c.id+'">'+esc(locSrcText(c))+'</span>';
+}
+function renderStep1(){
+  renderStyleGrid();
+  $('#lenSeg').innerHTML=LEN_OPTS.slice(0,6).map(n=>'<button type="button" data-action="len-all" data-v="'+n+'" aria-pressed="'+(S.segLen===n)+'">'+n+' 秒</button>').join('');
+  const el=$('#clipList');
+  if(!S.clips.length){el.innerHTML='<div class="empty">還沒有影片。按「選擇影片」從相簿挑選旅途中拍的片段。</div>';return;}
+  $('#listHead').hidden=S.clips.length<2;$('#orderStatus').hidden=S.clips.length<2;$('#sortTimeBtn').hidden=!S.manual;
+  const n=S.clips.length,arrow=d=>'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+(d==='up'?'M6 15l6-6 6 6':'M6 9l6 6 6-6')+'"></path></svg>';
+  el.innerHTML=S.clips.map((c,i)=>'<div class="clip" data-id="'+c.id+'"><button class="handle" type="button" data-handle="'+c.id+'" aria-label="拖曳調整順序"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></button><div class="thumb"><img src="'+esc(c.thumb||'')+'" alt=""><span class="order">'+(i+1)+'</span></div><div class="info"><strong>'+esc(c.place||'未命名地點')+'</strong><span class="meta">'+esc(fmtMD(c.date)+' '+(c.time||''))+(c.duration?' · 精彩片段 '+fmtDur(c.hlStart||0)+'–'+fmtDur((c.hlStart||0)+(c.segDur||SEG)):'')+'</span><label class="lenpick">剪輯<select data-len-id="'+c.id+'" aria-label="第 '+(i+1)+' 段要剪幾秒">'+lenOptions(c)+'</select></label><span class="tags">'+(c.lat!=null?'<span class="tag ok">有定位</span>':'<span class="tag">無定位</span>')+(c.faces&&c.faces.length?'<span class="tag ok">偵測到 '+c.faces.length+' 張人臉</span>':'')+(c.kind==='demo'?'<span class="tag">範例</span>':'')+'</span></div><div class="ctrls"><button class="icon" type="button" data-action="up" data-id="'+c.id+'" aria-label="往前移（目前第 '+(i+1)+' 段）"'+(i===0?' disabled':'')+'>'+arrow('up')+'</button><button class="icon" type="button" data-action="down" data-id="'+c.id+'" aria-label="往後移（目前第 '+(i+1)+' 段）"'+(i===n-1?' disabled':'')+'>'+arrow('down')+'</button><button class="icon" type="button" data-action="remove" data-id="'+c.id+'" aria-label="移除這段影片"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>'+locField(c,i)+'<label class="notefield"><span class="vh">第 '+(i+1)+' 段的心情</span><input type="text" data-note-id="'+c.id+'" maxlength="60" value="'+esc(c.note||'')+'" placeholder="寫下這一刻的心情，會顯示在影片上" autocomplete="off"></label></div>').join('');
+}
+function renderStep2(){
+  const d=dayCount();
+  $('#dateRange').textContent=S.clips.length?rangeText('/')+'　共 '+d+' 天':'—';
+  $('#country').value=S.country;$('#cities').value=S.cities;
+  $('#geoBtn').hidden=!S.clips.some(c=>c.lat!=null&&!c.manualGeo);
+  $('#placeRows').innerHTML=S.clips.map((c,i)=>'<div class="placerow"><img src="'+esc(c.thumb||'')+'" alt=""><div class="stack"><span class="meta">第 '+(i+1)+' 段 · '+esc(fmtMD(c.date)+' '+(c.time||''))+(c.lat!=null?(c.manualGeo?' · 手動定位':(c.hereGeo?' · 目前位置':' · 影片有定位')):' · 無定位')+'</span>'+locField(c,i)+'</div></div>').join('');
+  $('#gKey').value=gKey;
+  $('#wxBtn').hidden=!S.clips.some(c=>c.lat!=null);
+  $('#wxRows').innerHTML=tripDays().map(day=>{const w=S.weather[day]||{};
+    return '<div class="dayrow"><span class="d">'+fmtMD(day)+'</span><label><span class="vh">'+fmtMD(day)+' 天氣</span><select data-wx-day="'+day+'" data-f="cond"><option value="">未設定</option>'+CONDS.map(k=>'<option'+(w.cond===k?' selected':'')+'>'+k+'</option>').join('')+'</select></label><label class="temp"><span class="vh">'+fmtMD(day)+' 氣溫</span><input type="number" inputmode="numeric" data-wx-day="'+day+'" data-f="temp" value="'+(w.temp==null?'':w.temp)+'" placeholder="氣溫"><span aria-hidden="true">°C</span></label></div>';}).join('')||'<p class="status">選擇影片後會列出每天的天氣。</p>';
+}
+function renderStep3(){
+  $('#moodChips').innerHTML=MOODS.map(m=>'<button type="button" class="chip" data-action="mood" data-v="'+m+'" aria-pressed="'+S.moods.includes(m)+'">'+m+'</button>').join('');
+  $('#compChips').innerHTML=S.companions.length?S.companions.map((p,i)=>'<button type="button" class="chip person" data-action="comp-del" data-i="'+i+'" aria-label="移除 '+esc(p)+'">'+esc(p)+'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>').join(''):'<span class="status">還沒有加入旅伴，一個人旅行也很好。</span>';
+  $('#styleNote3').textContent='目前是「'+S.style+'風格」，可以在第 1 步更換。';
+  renderNotes();
+}
+function renderStep4(){
+  $('#moverSeg').innerHTML=MOVERS.map(([k,l])=>'<button type="button" data-action="mover" data-v="'+k+'" aria-pressed="'+(S.mover===k)+'">'+l+'</button>').join('');
+  const m=routeModel(720,960,mapBox(720,960,false));
+  $('#mapNote').textContent=m.synthetic?'影片沒有足夠的定位資料，路線依拍攝順序示意排列。':(m.pts.length+' 個地點'+(m.km!=null?'，全程約 '+fmtKm(m.km)+' 公里':'')+'。');
+}
+function renderNotes(){
+  $('#noteRows').innerHTML=S.clips.map((c,i)=>'<div class="noterow"><img src="'+esc(c.thumb||'')+'" alt=""><label class="field"><span class="meta">第 '+(i+1)+' 段 · '+esc(c.place||'未命名地點')+'</span><textarea data-note-id="'+c.id+'" maxlength="60" rows="2" placeholder="這一段的心情或描述">'+esc(c.note||'')+'</textarea></label></div>').join('')||'<p class="status">先在第 1 步選擇影片。</p>';
+}
+function totalLen(){return 3.2+S.clips.reduce((a,c)=>a+(c.segDur||SEG),0)+8.5;}
+function renderStep5(){renderMusic();$('#lenNote').textContent=S.clips.length?'片頭、'+S.clips.length+' 段影片（每段挑最精彩的片段）、結尾足跡地圖，成品約 '+Math.round(totalLen())+' 秒。':'先在第 1 步選擇影片。';}
+function renderNav(){
+  document.querySelectorAll('section[data-step]').forEach(s=>{s.hidden=+s.dataset.step!==S.step;});
+  document.querySelectorAll('#steps button').forEach(b=>{const n=+b.dataset.step;b.classList.toggle('done',n<S.step);if(n===S.step)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');});
+  $('#prevBtn').disabled=S.step===1;
+  $('#nextBtn').hidden=S.step===5;
+  $('#nextBtn').disabled=!S.clips.length;
+  $('#nextBtn').textContent=S.step===4?'下一步：剪輯':'下一步';
+}
+function setStep(n){
+  if(run)return;
+  if(n>1&&!S.clips.length)n=1;
+  S.step=clamp(n,1,5);
+  ({2:renderStep2,3:renderStep3,4:renderStep4,5:renderStep5}[S.step]||renderStep1)();
+  renderNav();
+  if(S.step===4)startMapLoop();else stopMapLoop();
+  if(S.step!==5)stopAudition();
+  if(S.step===5){if(ED.on)renderEditor();else drawStill();}
+  window.scrollTo(0,0);
+}
+
+/* ---------- demo scenes (procedural stand-ins for real footage) ---------- */
+function drawDemoScene(ctx,c,t){
+  const w=W,h=H,pal=c.pal;
+  const gr=ctx.createLinearGradient(0,0,0,h);gr.addColorStop(0,pal[0]);gr.addColorStop(1,pal[1]);ctx.fillStyle=gr;ctx.fillRect(0,0,w,h);
+  const r=rng(c.motif.length*97+7);
+  ctx.save();
+  if(c.motif==='bamboo'){
+    for(let i=0;i<28;i++){const dp=i%3,bw=12+dp*8,x=((i*57+t*(6+dp*5))%(w+140))-70,sw=Math.sin(t*.9+i)*10;
+      ctx.fillStyle=['#8DB781','#5F9254','#3D6E3A'][dp];
+      ctx.beginPath();ctx.moveTo(x,h);ctx.lineTo(x+bw,h);ctx.lineTo(x+bw+sw,0);ctx.lineTo(x+sw,0);ctx.fill();
+      ctx.fillStyle='rgba(25,50,25,.35)';for(let y=h-100-dp*40;y>0;y-=160+dp*25){const o=sw*(1-y/h);ctx.fillRect(x+o-2,y,bw+4,6);}}
+    const lg=ctx.createRadialGradient(520,120,10,520,120,620);lg.addColorStop(0,'rgba(255,252,225,.55)');lg.addColorStop(1,'rgba(255,252,225,0)');ctx.fillStyle=lg;ctx.fillRect(0,0,w,h);
+  }else if(c.motif==='temple'){
+    ctx.fillStyle='#FFF4DC';ctx.beginPath();ctx.arc(540,300,74,0,7);ctx.fill();
+    ctx.fillStyle='rgba(120,70,50,.35)';ctx.beginPath();ctx.moveTo(0,640);for(let x=0;x<=w;x+=40)ctx.lineTo(x,600+Math.sin(x/90+1)*40);ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.fill();
+    const ox=-t*4;ctx.save();ctx.translate(ox,0);
+    ctx.fillStyle='#C99B72';ctx.fillRect(170,600,420,170);
+    ctx.fillStyle='#3E2A22';ctx.beginPath();ctx.moveTo(110,610);ctx.lineTo(650,610);ctx.lineTo(560,520);ctx.lineTo(200,520);ctx.fill();
+    ctx.fillStyle='#6B3B26';ctx.fillRect(130,770,500,34);for(let k=0;k<9;k++)ctx.fillRect(140+k*60,804,14,300);
+    ctx.restore();
+    const by=Math.sin(t*1.4)*3;
+    ctx.fillStyle='#2E3A4A';ctx.beginPath();ctx.ellipse(360,620+by,190,190,0,Math.PI,0);ctx.lineTo(560,1280);ctx.lineTo(160,1280);ctx.fill();
+    ctx.fillStyle='#E2B996';ctx.fillRect(330,390+by,60,70);
+    ctx.beginPath();ctx.arc(360,335+by,72,0,7);ctx.fill();
+    ctx.fillStyle='#2A1C16';ctx.beginPath();ctx.arc(360,322+by,76,Math.PI*1.05,Math.PI*1.95);ctx.fill();
+    ctx.fillStyle='#3B2A22';ctx.beginPath();ctx.arc(335,345+by,6,0,7);ctx.arc(385,345+by,6,0,7);ctx.fill();
+    ctx.strokeStyle='#9A5A40';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.arc(360,365+by,18,.15*Math.PI,.85*Math.PI);ctx.stroke();
+    const cols=['#D9480F','#F08C3A','#E8590C','#B5360B','#F59F00'];
+    for(let i=0;i<16;i++){const x=(i*61+r()*40)%(w+80)-40,y=1000+r()*260,rad=70+r()*60;ctx.fillStyle=cols[i%5];ctx.beginPath();ctx.arc(x+Math.sin(t+i)*4,y,rad,0,7);ctx.fill();}
+  }else if(c.motif==='torii'){
+    ctx.fillStyle='#21160F';ctx.fillRect(0,820,w,h-820);
+    const ph=(t*.45)%1;
+    for(let k=9;k>=0;k--){const z=k+1-ph,s=1.7/(z+.55),gw=560*s,gh=820*s,base=560+470*s;
+      ctx.globalAlpha=clamp(s*1.1,0,1);
+      ctx.fillStyle='#D9480F';ctx.fillRect(360-gw*.4-17*s,base-gh,34*s,gh);ctx.fillRect(360+gw*.4-17*s,base-gh,34*s,gh);
+      ctx.fillRect(360-gw*.46,base-gh+90*s,gw*.92,26*s);
+      ctx.fillStyle='#1E140F';ctx.fillRect(360-gw*.55,base-gh-26*s,gw*1.1,34*s);
+      ctx.fillStyle='#1E140F';ctx.fillRect(360-gw*.4-20*s,base-40*s,40*s,40*s);ctx.fillRect(360+gw*.4-20*s,base-40*s,40*s,40*s);}
+    ctx.globalAlpha=1;
+  }else if(c.motif==='market'){
+    ctx.fillStyle='#1A1310';ctx.fillRect(0,0,w,200);
+    for(let i=0;i<7;i++){const x=(((i*150-t*14)%(w+150))+w+150)%(w+150)-75,y=310+Math.sin(t*2+i)*10;
+      const gl=ctx.createRadialGradient(x,y,10,x,y,150);gl.addColorStop(0,'rgba(255,170,90,.5)');gl.addColorStop(1,'rgba(255,170,90,0)');ctx.fillStyle=gl;ctx.fillRect(x-150,y-150,300,300);
+      ctx.fillStyle='#E8590C';ctx.beginPath();ctx.ellipse(x,y,42,58,0,0,7);ctx.fill();ctx.fillStyle='#2A1A12';ctx.fillRect(x-30,y-64,60,10);ctx.fillRect(x-30,y+54,60,10);}
+    for(let i=0;i<5;i++){const x=i*160-20;ctx.fillStyle='#F4C27A';ctx.fillRect(x,760,140,180);ctx.fillStyle='#5A3A2A';ctx.fillRect(x-6,930,152,40);ctx.fillStyle='rgba(90,58,42,.5)';ctx.fillRect(x+12,790,116,20);}
+    ctx.fillStyle='#120C0A';for(let i=0;i<6;i++){const x=(((i*140+t*(20+i*6))%(w+120))+w+120)%(w+120)-60,y=1080+(i%2)*60;ctx.beginPath();ctx.arc(x,y-120,34,0,7);ctx.fill();rrect(ctx,x-48,y-80,96,220,40);ctx.fill();}
+  }else if(c.motif==='castle'){
+    ctx.fillStyle='rgba(255,255,255,.75)';for(let i=0;i<4;i++){const x=((i*230+t*12)%(w+300))-150;ctx.beginPath();ctx.ellipse(x,180+i*70,130,34,0,0,7);ctx.fill();}
+    ctx.fillStyle='#8E8B82';ctx.beginPath();ctx.moveTo(220,820);ctx.lineTo(500,820);ctx.lineTo(550,960);ctx.lineTo(170,960);ctx.fill();
+    const tier=(x,y,wd,ht)=>{ctx.fillStyle='#F3EFE4';ctx.fillRect(x,y,wd,ht);ctx.fillStyle='#2F6F66';ctx.beginPath();ctx.moveTo(x-30,y+6);ctx.lineTo(x+wd+30,y+6);ctx.lineTo(x+wd-10,y-36);ctx.lineTo(x+10,y-36);ctx.fill();};
+    tier(250,700,220,120);tier(280,600,160,100);tier(306,520,108,80);
+    ctx.fillStyle='#C9A227';ctx.fillRect(330,474,10,12);ctx.fillRect(380,474,10,12);
+    ctx.fillStyle='#4D7A4F';for(let i=0;i<9;i++){ctx.beginPath();ctx.arc(i*90+20,930,70,0,7);ctx.fill();}
+    ctx.fillStyle='#6E95A8';ctx.fillRect(0,980,w,h-980);
+    ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=3;for(let i=0;i<10;i++){const y=1010+i*28;ctx.beginPath();ctx.moveTo(((i*90+t*20)%w),y);ctx.lineTo(((i*90+t*20)%w)+120,y);ctx.stroke();}
+    ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=2;for(let i=0;i<70;i++){const x=(i*37+t*160)%(w+100)-50,y=(i*131+t*900)%h;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-10,y+34);ctx.stroke();}
+  }else{
+    const rr=rng(42);ctx.fillStyle='#0D1124';
+    let x=0;while(x<w){const bw=60+rr()*90,bh=260+rr()*420;ctx.fillStyle='#161B33';ctx.fillRect(x,900-bh,bw,bh);
+      ctx.fillStyle='rgba(255,214,120,.75)';for(let yy=900-bh+20;yy<880;yy+=34)for(let xx=x+10;xx<x+bw-14;xx+=22)if(rr()>.45)ctx.fillRect(xx,yy,10,14);x+=bw+6;}
+    const neon=['#FF4D8D','#3DD6F5','#FFD23F'];
+    for(let i=0;i<5;i++){const nx=40+i*140,ny=420+(i%2)*120,on=Math.sin(t*3+i*2)>-.6;ctx.shadowColor=neon[i%3];ctx.shadowBlur=on?30:0;ctx.fillStyle=on?neon[i%3]:'#3A3A4A';ctx.fillRect(nx,ny,90,150);}
+    ctx.shadowBlur=0;ctx.fillStyle='#080B18';ctx.fillRect(0,900,w,h-900);
+    for(let i=0;i<14;i++){const y=930+i*24;ctx.fillStyle=neon[i%3];ctx.globalAlpha=.35;ctx.fillRect(60+(i*53%500)+Math.sin(t*2+i)*16,y,120,5);}
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+/* ---------- footprint map ---------- */
+function mapBox(w,h,video){const bars=video&&VSTYLE[S.style].bars;return video?{l:90,t:bars?330:290,r:w-90,b:h-(bars?470:430)}:{l:80,t:170,r:w-80,b:h-150};}
+function routeModel(w,h,box){
+  let src=[];
+  const geo=S.clips.filter(c=>c.lat!=null);
+  geo.forEach(c=>{const last=src[src.length-1];if(last&&haversine(last,c)<0.05){if(!last.label&&c.place)last.label=c.place;return;}src.push({lat:c.lat,lon:c.lon,label:c.place||c.city||''});});
+  const pts=[];let synthetic=false,km=null;
+  if(src.length>=2){
+    km=0;for(let i=1;i<src.length;i++)km+=haversine(src[i-1],src[i]);
+    const mLat=src.reduce((a,p)=>a+p.lat,0)/src.length,k=Math.cos(mLat*Math.PI/180);
+    const xs=src.map(p=>p.lon*k),ys=src.map(p=>-p.lat);
+    const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+    const bw=box.r-box.l,bh=box.b-box.t;let s=Math.min(bw/Math.max(maxX-minX,1e-9),bh/Math.max(maxY-minY,1e-9));
+    if(!isFinite(s)||s>bw/0.004)s=bw/0.004;
+    const ox=box.l+(bw-(maxX-minX)*s)/2,oy=box.t+(bh-(maxY-minY)*s)/2;
+    src.forEach((p,i)=>pts.push({x:ox+(xs[i]-minX)*s,y:oy+(ys[i]-minY)*s,label:p.label}));
+  }else{
+    synthetic=true;const n=Math.max(S.clips.length,2);
+    for(let i=0;i<n;i++){const f=n===1?0:i/(n-1),c=S.clips[i]||{};pts.push({x:box.l+(box.r-box.l)*(.08+.84*f),y:box.b-(box.b-box.t)*f+Math.sin(i*1.7)*40,label:c.place||c.city||('第 '+(i+1)+' 段')});}
+  }
+  const path=[];const fr=[0];let len=0;
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
+    for(let j=(i===0?0:1);j<=24;j++){const t=j/24,t2=t*t,t3=t2*t;
+      const x=.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3);
+      const y=.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3);
+      const prev=path[path.length-1];if(prev)len+=Math.hypot(x-prev.x,y-prev.y);path.push({x,y,len});}
+    fr.push(len);
+  }
+  return {pts,path,total:len||1,fr:fr.map(v=>v/(len||1)),synthetic,km};
+}
+function fmtKm(k){return k<10?k.toFixed(1):String(Math.round(k));}
+function pointAt(m,L){const p=m.path;if(!p.length)return{x:0,y:0,dx:1,dy:0};let i=1;while(i<p.length-1&&p[i].len<L)i++;
+  const a=p[i-1]||p[0],b=p[i]||a;const seg=b.len-a.len||1,f=clamp((L-a.len)/seg,0,1);return{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,dx:b.x-a.x,dy:b.y-a.y};}
+function drawMapBg(ctx,w,h,seed){
+  const r=rng(seed);ctx.fillStyle='#ECEEE4';ctx.fillRect(0,0,w,h);
+  ctx.fillStyle='#D3E3C4';for(let i=0;i<6;i++){rrect(ctx,r()*w-60,r()*h,120+r()*160,90+r()*140,26);ctx.fill();}
+  ctx.strokeStyle='#BBD7E4';ctx.lineWidth=34;ctx.lineCap='round';ctx.beginPath();const ry=h*(.25+r()*.5);ctx.moveTo(-40,ry);ctx.bezierCurveTo(w*.3,ry-160+r()*120,w*.6,ry+160-r()*120,w+40,ry+(r()-.5)*200);ctx.stroke();
+  ctx.strokeStyle='#F8F9F4';ctx.lineWidth=5;for(let i=0;i<26;i++){const v=r()<.5;ctx.beginPath();if(v){const x=r()*w;ctx.moveTo(x,-10);ctx.lineTo(x+(r()-.5)*160,h+10);}else{const y=r()*h;ctx.moveTo(-10,y);ctx.lineTo(w+10,y+(r()-.5)*160);}ctx.stroke();}
+  ctx.strokeStyle='#FFFFFF';ctx.lineWidth=12;for(let i=0;i<7;i++){const v=i%2===0;ctx.beginPath();if(v){const x=r()*w;ctx.moveTo(x,-10);ctx.lineTo(x+(r()-.5)*240,h+10);}else{const y=r()*h;ctx.moveTo(-10,y);ctx.lineTo(w+10,y+(r()-.5)*240);}ctx.stroke();}
+}
+function drawMover(ctx,x,y,kind,t,dir){
+  ctx.save();ctx.translate(x,y);
+  const bob=kind==='walk'?-Math.abs(Math.sin(t*9))*6:0;
+  ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(0,4,16,6,0,0,7);ctx.fill();
+  ctx.fillStyle='#C2410C';ctx.beginPath();ctx.moveTo(-12,-18+bob);ctx.lineTo(12,-18+bob);ctx.lineTo(0,0);ctx.fill();
+  ctx.beginPath();ctx.arc(0,-50+bob,36,0,7);ctx.fill();ctx.strokeStyle='#FFFFFF';ctx.lineWidth=6;ctx.stroke();
+  ctx.translate(0,-50+bob);ctx.strokeStyle='#FFFFFF';ctx.fillStyle='#FFFFFF';ctx.lineWidth=5;ctx.lineCap='round';ctx.lineJoin='round';
+  if(kind==='walk'){
+    const sw=Math.sin(t*9);if(dir.dx<0)ctx.scale(-1,1);
+    ctx.beginPath();ctx.arc(2,-19,6,0,7);ctx.fill();
+    ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(-2,6);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(-2,6);ctx.lineTo(-2+11*sw,22);ctx.moveTo(-2,6);ctx.lineTo(-2-11*sw,22);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,-6);ctx.lineTo(10*sw,6);ctx.moveTo(0,-6);ctx.lineTo(-10*sw,6);ctx.stroke();
+  }else if(kind==='car'){
+    if(dir.dx<0)ctx.scale(-1,1);
+    rrect(ctx,-20,-6,40,14,4);ctx.fill();rrect(ctx,-11,-16,20,12,4);ctx.fill();
+    ctx.fillStyle='#C2410C';ctx.beginPath();ctx.arc(-11,10,6,0,7);ctx.arc(11,10,6,0,7);ctx.fill();
+    ctx.fillStyle='#FFFFFF';ctx.beginPath();ctx.arc(-11,10,4,0,7);ctx.fill();ctx.beginPath();ctx.arc(11,10,4,0,7);ctx.fill();
+  }else{
+    ctx.rotate(Math.atan2(dir.dy,dir.dx));
+    ctx.beginPath();ctx.moveTo(-20,0);ctx.lineTo(20,0);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(4,0);ctx.lineTo(-6,-18);ctx.lineTo(-2,-18);ctx.lineTo(12,0);ctx.lineTo(-2,18);ctx.lineTo(-6,18);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(-22,-9);ctx.moveTo(-18,0);ctx.lineTo(-22,9);ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawMap(ctx,w,h,t,opt){
+  const box=mapBox(w,h,opt.video);const m=routeModel(w,h,box);
+  const seed=Math.round((m.pts[0]?m.pts[0].x:1)*13+m.pts.length*101);
+  ctx.save();drawMapBg(ctx,w,h,seed);
+  const p=clamp((t-.6)/5.6,0,1);
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle='rgba(194,65,12,.35)';ctx.lineWidth=7;ctx.setLineDash([2,16]);ctx.beginPath();m.path.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();ctx.setLineDash([]);
+  const L=p*m.total;ctx.strokeStyle='#C2410C';ctx.lineWidth=10;ctx.beginPath();
+  for(let i=0;i<m.path.length;i++){const q=m.path[i];if(q.len>L){const e=pointAt(m,L);ctx.lineTo(e.x,e.y);break;}i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);}ctx.stroke();
+  ctx.font='700 26px '+SANS;ctx.textBaseline='middle';ctx.textAlign='left';
+  m.pts.forEach((q,i)=>{ctx.fillStyle='#FFFFFF';ctx.strokeStyle='#0F766E';ctx.lineWidth=6;ctx.beginPath();ctx.arc(q.x,q.y,13,0,7);ctx.fill();ctx.stroke();
+    const reached=m.fr[i]<=p+1e-3;if(reached&&q.label){const a=clamp((p-m.fr[i])*8+.4,0,1);const tw=Math.min(ctx.measureText(q.label).width,300)+28;
+      let lx=clamp(q.x-tw/2,12,w-tw-12),ly=q.y+(i%2?30:-74);ctx.globalAlpha=a;ctx.fillStyle='rgba(0,0,0,.12)';rrect(ctx,lx,ly+3,tw,44,22);ctx.fill();
+      ctx.fillStyle='#FFFFFF';rrect(ctx,lx,ly,tw,44,22);ctx.fill();ctx.fillStyle='#1B2430';ctx.fillText(q.label,lx+14,ly+23,300);ctx.globalAlpha=1;}});
+  const pos=pointAt(m,L);drawMover(ctx,pos.x,pos.y,S.mover,t,pos);
+  const hy=box.t-(opt.video?150:120);
+  const head='足跡 · '+(rangeText('.')||'');ctx.font='700 30px '+SANS;const hw=ctx.measureText(head).width+40;
+  ctx.fillStyle='#1B2430';ctx.fillText(head,44,hy+29);
+  if(m.synthetic){ctx.font='500 22px '+SANS;ctx.fillStyle='#566170';ctx.fillText('未取得定位，路線為示意',44,hy+84);}
+  const sa=clamp((t-6.4)/.6,0,1);
+  if(sa>0){
+    const bh=opt.video?230:190,by=opt.video?h-(VSTYLE[S.style].bars?150:70)-bh:h-30-bh;
+    ctx.globalAlpha=sa;{const g=ctx.createLinearGradient(0,by-80,0,by+bh);g.addColorStop(0,'rgba(236,238,228,0)');g.addColorStop(.45,'rgba(236,238,228,.92)');g.addColorStop(1,'rgba(236,238,228,.96)');ctx.fillStyle=g;ctx.fillRect(0,by-80,w,h-by+80);}
+    const days=dayCount(),line1=days+' 天 · '+S.clips.length+' 段回憶'+(m.km!=null?' · 約 '+fmtKm(m.km)+' 公里':'');
+    ctx.fillStyle='#1B2430';ctx.font='700 40px '+SANS;ctx.fillText(line1,76,by+(1-sa)*20+(opt.video?66:58),w-150);
+    ctx.font='500 30px '+SANS;ctx.fillStyle='#566170';
+    const l2=[placeTitle(),compText()].filter(Boolean);
+    l2.forEach((s,i)=>ctx.fillText(s,76,by+(1-sa)*20+(opt.video?126:112)+i*46,w-150));
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+let mapRAF=null;
+function startMapLoop(){stopMapLoop();const cv=$('#mapCanvas'),ctx=cv.getContext('2d');const t0=performance.now();
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const f=()=>{const t=reduce?7.5:((performance.now()-t0)/1000)%9.5;drawMap(ctx,720,960,t,{video:false});if(!reduce)mapRAF=requestAnimationFrame(f);};f();}
+function stopMapLoop(){if(mapRAF)cancelAnimationFrame(mapRAF);mapRAF=null;}
+
+/* ---------- video frames ---------- */
+function buildSegments(){const segs=[{type:'intro',dur:3.2}];
+  S.clips.forEach(c=>segs.push({type:'clip',clip:c,dur:c.segDur||SEG,start:c.hlStart||0,text:(c.note||'').trim()}));segs.push({type:'map',dur:8.5});segs[0].bg=segs[1];return segs;}
+function srcTime(st,lt,dur){if(st.speed==='ramp'){const a=dur*.4;return lt<a?lt*1.7:a*1.7+(lt-a)*.6;}return lt*(st.speed||1);}
+function motionXf(ctx,st,lt,dur){
+  const p=clamp(lt/(dur||3),0,1);let sc=1,tx=0,ty=0;const z=st.zoom||.06;
+  if(st.motion==='zoomIn')sc=1+z*ease(p);
+  else if(st.motion==='zoomOut')sc=1+z-z*ease(p);
+  else if(st.motion==='pan'){sc=1.08;tx=(.5-p)*48;}
+  else if(st.motion==='drift'){sc=1.05;tx=Math.sin(lt*1.3)*6+Math.sin(lt*3.7)*2;ty=Math.cos(lt*1.7)*5+Math.sin(lt*4.3)*1.5;}
+  else if(st.motion==='punch')sc=p<.5?1.02:1.15;
+  else if(st.motion==='shake'){sc=1.06;if(lt<.35){const f=1-lt/.35;tx=Math.sin(lt*90)*16*f;ty=Math.cos(lt*77)*12*f;}}
+  else if(st.motion==='bounce')sc=1.04+.035*Math.abs(Math.sin(lt*Math.PI*2.2));
+  ctx.translate(W/2+tx,H/2+ty);ctx.scale(sc,sc);ctx.translate(-W/2,-H/2);
+}
+function gradeLayers(ctx,st){
+  if(st.tint){ctx.save();ctx.globalCompositeOperation=st.tint[1];ctx.fillStyle=st.tint[0];ctx.fillRect(0,0,W,H);ctx.restore();}
+  if(!FILTER_OK&&st.desat){ctx.save();ctx.globalCompositeOperation='saturation';ctx.globalAlpha=st.desat;ctx.fillStyle='#808080';ctx.fillRect(0,0,W,H);ctx.restore();}
+  if(st.lift){ctx.save();ctx.globalCompositeOperation='screen';ctx.fillStyle='rgba(255,255,255,'+st.lift+')';ctx.fillRect(0,0,W,H);ctx.restore();}
+  if(st.vignette){const g=ctx.createRadialGradient(W/2,H/2,H*.28,W/2,H/2,H*.72);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,'+st.vignette+')');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
+}
+function drawBase(ctx,seg,lt){
+  const c=seg&&seg.clip;ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);if(!c)return;
+  const st=VSTYLE[S.style];
+  ctx.save();motionXf(ctx,st,lt,seg.dur);
+  if(FILTER_OK&&st.filter)ctx.filter=st.filter;
+  if(c.kind==='demo')drawDemoScene(ctx,c,(seg.start||0)+srcTime(st,lt,seg.dur||3));
+  else if(seg.video&&seg.video.readyState>=2)coverDraw(ctx,seg.video,seg.video.videoWidth,seg.video.videoHeight,W,H);
+  else if(c.posterImg&&c.posterImg.complete&&c.posterImg.naturalWidth)coverDraw(ctx,c.posterImg,c.posterImg.naturalWidth,c.posterImg.naturalHeight,W,H);
+  else if(c.thumbImg&&c.thumbImg.complete)coverDraw(ctx,c.thumbImg,c.thumbImg.naturalWidth,c.thumbImg.naturalHeight,W,H);
+  if(FILTER_OK)ctx.filter='none';
+  ctx.restore();
+  gradeLayers(ctx,st);
+}
+/* Caption blocks: a title block (date, place, city) and an info block (chips, sentence).
+   Three placements are tried; the one that covers the least face area wins. */
+function measureOverlay(ctx,seg){
+  const c=seg.clip,st=VSTYLE[S.style];
+  ctx.font='700 64px '+st.title;const place=wrap(ctx,c.place||c.city||S.cities||'旅途中',616,3);
+  let tw=place.reduce((m,l)=>Math.max(m,ctx.measureText(l).width),0);
+  const sub=[c.country||S.country,c.city||(S.cities||'').split('、')[0]].filter(Boolean).join(' · ');
+  ctx.font='500 28px '+SANS;tw=Math.max(tw,sub?ctx.measureText(sub).width:0);
+  ctx.font='500 26px '+SANS;const dateText=(fmtDot(c.date)+'　'+(c.time||'')).trim();tw=Math.max(tw,ctx.measureText(dateText).width);
+  const titleH=34+14+76*place.length+(sub?8+36:0);
+  const chips=chipsFor(c).join('　·　');const cl=chips?wrap(ctx,chips,616,2):[];
+  let iw=cl.reduce((m,l)=>Math.max(m,ctx.measureText(l).width),0);
+  ctx.font='400 32px '+SANS;const lines=seg.text?wrap(ctx,seg.text,616,4):[];
+  iw=Math.max(iw,lines.reduce((m,l)=>Math.max(m,ctx.measureText(l).width),0));
+  const chipsH=cl.length*36,infoH=chipsH+(cl.length&&lines.length?18:0)+lines.length*48;
+  return {place,sub,dateText,titleH,tw:tw+8,chipsH,infoH,iw:iw+8,lines};
+}
+function faceRects(c){
+  if(!c.faces||!c.faces.length)return[];
+  const vw=c.vw||W,vh=c.vh||H,s=Math.max(W/vw,H/vh),ox=(W-vw*s)/2,oy=(H-vh*s)/2;
+  return c.faces.map(b=>{const x=ox+b.x*vw*s,y=oy+b.y*vh*s,w=b.w*vw*s,h=b.h*vh*s,px=w*.25,py=h*.25;return{x:x-px,y:y-py,w:w+2*px,h:h+2*py};});
+}
+function overlapArea(a,b){const w=Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x),h=Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y);return w>0&&h>0?w*h:0;}
+function chooseLayout(c,m){
+  const st=VSTYLE[S.style],top=(st.bars?110:0)+60,bot=H-(st.bars?110:0)-60,gap=40;
+  const opts=[
+    {name:'split',ty:top,iy:bot-m.infoH},
+    {name:'bottom',iy:bot-m.infoH,ty:bot-m.infoH-(m.infoH?gap:0)-m.titleH},
+    {name:'top',ty:top,iy:top+m.titleH+gap}
+  ];
+  const faces=faceRects(c);
+  if(!faces.length)return opts[0];
+  let best=opts[0],bestA=Infinity;
+  opts.forEach((o,i)=>{const boxes=[{x:52,y:o.ty,w:m.tw,h:m.titleH}];if(m.infoH)boxes.push({x:52,y:o.iy,w:m.iw,h:m.infoH});
+    const area=faces.reduce((a,f)=>a+boxes.reduce((b,x)=>b+overlapArea(f,x),0),0)+i*50;
+    if(area<bestA){bestA=area;best=o;}});
+  return best;
+}
+function shade(ctx,y0,y1,dir){const g=ctx.createLinearGradient(0,y0,0,y1);
+  if(dir==='down'){g.addColorStop(0,'rgba(0,0,0,.55)');g.addColorStop(1,'rgba(0,0,0,0)');}else{g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.65)');}
+  ctx.fillStyle=g;ctx.fillRect(0,y0,W,y1-y0);}
+/* ---------- text items: every caption is an item the viewer can restyle ---------- */
+const FONTS={sans:{label:'黑體',fam:SANS},serif:{label:'明體',fam:SERIF},kai:{label:'楷書',fam:'"LXGW WenKai TC","Kaiti TC","BiauKai","DFKai-SB",serif'},hand:{label:'手寫',fam:'"Iansui","LXGW WenKai TC","Kaiti TC",cursive'}};
+const SWATCHES=[['#FFFFFF','白'],['#FFF1D6','米白'],['#FFD23F','黃'],['#FFB27A','橘'],['#FF7B7B','珊瑚紅'],['#7FE3D0','薄荷綠'],['#8EC5FF','天空藍'],['#1B2430','深藍黑']];
+const LABELS={date:'日期時間',title:'地點標題',sub:'國家城市',chips:'標籤',note:'心情短文',kicker:'小標',ititle:'片頭標題',idate:'旅遊日期',people:'旅伴',imood:'心情'};
+function segOv(seg){if(seg.type==='intro')return S.introOv||(S.introOv={});const c=seg.clip;return c.ov||(c.ov={});}
+function fontStr(it){return it.weight+' '+Math.round(it.size)+'px '+FONTS[it.font].fam;}
+function chipsFor(c){const w=S.weather[c.date];const out=[];
+  if(w&&w.cond)out.push(w.cond+(w.temp!=null&&w.temp!==''?' '+w.temp+'°C':''));if(S.moods.length)out.push(S.moods.join(' · '));if(S.companions.length)out.push(compText());return out;}
+function T(key,text,x,y,size,o){return Object.assign({key,text,x,y,size,weight:500,font:'sans',color:'#FFFFFF',maxW:616,maxLines:2,lh:1.3,align:'left'},o||{});}
+function baseItems(ctx,seg){
+  const st=VSTYLE[S.style],tk=st.tf;
+  if(seg.type==='clip'){
+    const c=seg.clip,m=measureOverlay(ctx,seg);if(!seg.layout)seg.layout=chooseLayout(c,m);const L=seg.layout;
+    const n=m.place.length,ty=L.ty+48;
+    return [
+      T('date',m.dateText,52,L.ty,26,{color:'rgba(255,255,255,.88)'}),
+      T('title',c.place||c.city||S.cities||'旅途中',52,ty,64,{weight:700,font:tk,maxLines:3,lh:76/64}),
+      T('sub',m.sub,52,ty+76*n+8,28,{color:'rgba(255,255,255,.9)'}),
+      T('chips',chipsFor(c),52,L.iy,26,{type:'chips',color:'rgba(255,255,255,.92)',lh:36/26}),
+      T('note',seg.text||'',52,L.iy+m.chipsH+(m.chipsH&&m.lines.length?18:0),32,{weight:400,maxLines:4,lh:1.5})
+    ];
+  }
+  ctx.font='700 80px '+st.title;const n=Math.max(1,wrap(ctx,placeTitle()||'我的旅行',620,2).length);
+  let y=560+n*96+20;const out=[
+    T('kicker',st.kicker,W/2,470,26,{align:'center',color:'rgba(255,255,255,.82)',maxW:640,maxLines:1,lh:1.2}),
+    T('ititle',placeTitle()||'我的旅行',W/2,530,80,{align:'center',weight:700,font:tk,maxW:620,maxLines:3,lh:96/80}),
+    T('idate',rangeText('.'),W/2,y,34,{align:'center',color:'rgba(255,255,255,.92)',maxW:640,maxLines:1,lh:1.2})];
+  y+=62;
+  out.push(T('people',compText(),W/2,y,30,{align:'center',weight:400,color:'rgba(255,255,255,.9)',maxW:640,lh:1.4}));
+  out.push(T('imood',S.moods.join(' · '),W/2,y+(compText()?50:0),30,{align:'center',weight:400,color:'rgba(255,255,255,.9)',maxW:640,lh:1.4}));
+  return out;
+}
+function layoutItem(ctx,it){
+  ctx.font=fontStr(it);
+  const src=Array.isArray(it.text)?it.text.map(t=>String(t).trim()).filter(Boolean).join('　·　'):String(it.text||'');
+  const lines=[];src.split('\n').forEach(par=>{if(!par.trim())return;wrap(ctx,par,it.maxW,0).forEach(l=>lines.push(l));});
+  if(lines.length>it.maxLines){lines.length=it.maxLines;lines[it.maxLines-1]=lines[it.maxLines-1].slice(0,-1)+'…';}
+  const lh=it.size*it.lh,w=lines.reduce((a,l)=>Math.max(a,ctx.measureText(l).width),0);
+  it.lines=lines;it.lineH=lh;it.box={x:it.align==='center'?it.x-w/2:(it.align==='right'?it.x-w:it.x),y:it.y,w,h:lines.length*lh};
+  return it;
+}
+function segItems(ctx,seg){
+  const ov=segOv(seg);
+  const items=baseItems(ctx,seg).map(it=>{const o=ov[it.key]||{};
+    if(o.text!=null&&it.key!=='note')it.text=o.text;
+    if(o.color)it.color=o.color;if(o.scale)it.size*=o.scale;if(o.font&&FONTS[o.font])it.font=o.font;
+    it.x+=o.dx||0;it.y+=o.dy||0;it.hidden=!!o.hidden;
+    if(it.align==='center')it.maxW=Math.max(200,Math.min(it.maxW,2*Math.min(it.x,W-it.x)-60));else it.maxW=Math.max(200,Math.min(it.maxW,W-40-it.x));
+    return layoutItem(ctx,it);});
+  seg.items=items;return items;
+}
+function isDark(c){const m=/^#([0-9a-f]{6})$/i.exec(c||'');if(!m)return false;const v=parseInt(m[1],16);return((v>>16)*.299+((v>>8)&255)*.587+(v&255)*.114)<90;}
+function drawItem(ctx,it){
+  if(it.hidden||!it.box||it.box.h<=0)return;
+  ctx.font=fontStr(it);ctx.textBaseline='middle';ctx.textAlign=it.align||'left';ctx.lineJoin='round';
+  const dark=isDark(it.color);
+  it.lines.forEach((l,i)=>{const yy=it.y+i*it.lineH+it.lineH/2;
+    ctx.shadowColor='transparent';ctx.lineWidth=Math.max(2,it.size*.07);ctx.strokeStyle=dark?'rgba(255,255,255,.45)':'rgba(0,0,0,.32)';ctx.strokeText(l,it.x,yy);
+    ctx.shadowColor=dark?'rgba(255,255,255,.55)':'rgba(0,0,0,.6)';ctx.shadowBlur=it.size>50?16:10;ctx.shadowOffsetY=2;
+    ctx.fillStyle=it.color;ctx.fillText(l,it.x,yy);});
+  ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+}
+function drawClipOverlay(ctx,seg,lt){
+  const c=seg.clip,st=VSTYLE[S.style],barT=st.bars?110:0,barB=st.bars?110:0;
+  const items=segItems(ctx,seg).filter(it=>!it.hidden&&it.box.h>0);
+  const topEnd=Math.max(0,...items.filter(it=>it.box.y<H/2).map(it=>it.box.y+it.box.h));
+  const botStart=Math.min(H,...items.filter(it=>it.box.y>=H/2).map(it=>it.box.y));
+  if(topEnd>0)shade(ctx,barT,Math.min(H,topEnd+120),'down');
+  if(botStart<H)shade(ctx,Math.max(0,botStart-180),H-barB,'up');
+  items.forEach((it,k)=>{ctx.save();const a=ease((lt-.15-k*.08)/.55);ctx.globalAlpha=a;ctx.translate(0,(1-a)*18);drawItem(ctx,it);ctx.restore();});
+  if(c.kind==='demo'){ctx.save();ctx.font='500 22px '+SANS;ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillText('範例畫面',W-40,barT+40);ctx.restore();}
+}
+function drawIntro(ctx,seg,lt){
+  drawBase(ctx,seg.bg?Object.assign({},seg.bg,{dur:seg.dur}):null,lt);
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'rgba(0,0,0,.25)');g.addColorStop(.5,'rgba(0,0,0,.5)');g.addColorStop(1,'rgba(0,0,0,.3)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const items=segItems(ctx,seg);
+  items.forEach((it,k)=>{ctx.save();const a=ease((lt-.2-k*.22)/.6);ctx.globalAlpha=a;ctx.translate(0,(1-a)*20);drawItem(ctx,it);ctx.restore();});
+}
+let grainCv=null;
+function drawGrain(ctx,amt){if(!grainCv){grainCv=document.createElement('canvas');grainCv.width=grainCv.height=256;const g=grainCv.getContext('2d');const d=g.createImageData(256,256);
+  for(let i=0;i<d.data.length;i+=4){const v=Math.random()*255;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255;}g.putImageData(d,0,0);}
+  ctx.save();ctx.globalAlpha=amt;ctx.globalCompositeOperation='overlay';const ox=Math.random()*256,oy=Math.random()*256;
+  for(let x=-ox;x<W;x+=256)for(let y=-oy;y<H;y+=256)ctx.drawImage(grainCv,x,y);ctx.restore();}
+function drawSegment(ctx,seg,lt){
+  const st=VSTYLE[S.style],td=st.td||0,k=td?clamp(lt/td,0,1):1,e=ease(k),prev=seg.prev&&td&&k<1?seg.prev:null;
+  ctx.save();ctx.globalAlpha=1;ctx.shadowBlur=0;ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  if(prev&&(st.trans==='push'||st.trans==='whip'))ctx.translate((1-e)*W,0);
+  if(seg.type==='intro')drawIntro(ctx,seg,lt);
+  else if(seg.type==='clip'){drawBase(ctx,seg,lt);drawClipOverlay(ctx,seg,lt);}
+  else drawMap(ctx,W,H,lt,{video:true});
+  ctx.restore();
+  if(st.grain&&seg.type!=='map')drawGrain(ctx,st.grain);
+  if(st.bars){ctx.fillStyle='#000';ctx.fillRect(0,0,W,110);ctx.fillRect(0,H-110,W,110);}
+  if(prev){
+    ctx.save();
+    if(st.trans==='fadeBlack'){if(lt<td/2){ctx.drawImage(prev,0,0);ctx.fillStyle='rgba(0,0,0,'+(lt/(td/2))+')';}else ctx.fillStyle='rgba(0,0,0,'+(1-(lt-td/2)/(td/2))+')';ctx.fillRect(0,0,W,H);}
+    else if(st.trans==='dissolve'){ctx.globalAlpha=1-e;ctx.drawImage(prev,0,0);}
+    else if(st.trans==='flash'){ctx.globalAlpha=Math.max(0,1-k*1.8);ctx.drawImage(prev,0,0);ctx.globalAlpha=1;ctx.fillStyle='rgba(255,255,255,'+(.85*(1-k))+')';ctx.fillRect(0,0,W,H);}
+    else if(st.trans==='push')ctx.drawImage(prev,-e*W,0);
+    else if(st.trans==='whip'){for(let g=3;g>=0;g--){ctx.globalAlpha=g?.25*(1-k):1;ctx.drawImage(prev,-e*W+g*36*(1-k),0);}}
+    else if(st.trans==='wipe'){const x=-260+e*(W+520);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(W+10,0);ctx.lineTo(W+10,H);ctx.lineTo(x-260,H);ctx.closePath();ctx.clip();ctx.drawImage(prev,0,0);}
+    else if(st.trans==='glitch'){const a=1-k;for(let sl=0;sl<12;sl++){const y=Math.floor(Math.random()*H),h=20+Math.random()*90,dx=(Math.random()-.5)*90*a;ctx.globalAlpha=a;ctx.drawImage(prev,0,y,W,h,dx,y,W,h);}
+      ctx.globalCompositeOperation='screen';ctx.globalAlpha=.3*a;ctx.drawImage(prev,12,0);ctx.drawImage(prev,-12,0);}
+    ctx.restore();
+  }
+  if(seg.type==='intro'&&lt<.6){ctx.fillStyle='rgba(0,0,0,'+(1-lt/.6)+')';ctx.fillRect(0,0,W,H);}
+  if(seg.type==='map'){const a=clamp((seg.dur-lt)/.8,0,1);if(a<1){ctx.fillStyle='rgba(0,0,0,'+(1-a)+')';ctx.fillRect(0,0,W,H);}}
+}
+function drawStill(){const cv=$('#out');if(!cv||run)return;const ctx=cv.getContext('2d');
+  if(!S.clips.length){ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);return;}
+  if(ED.on){drawEditor();return;}
+  const segs=buildSegments();drawSegment(ctx,segs[0],2.4);}
+
+/* ---------- on-video text editor ---------- */
+const ED={on:false,seg:1,key:null,drag:null,cur:null};
+function edSeg(){const segs=buildSegments();ED.seg=clamp(ED.seg,0,segs.length-2);return segs[ED.seg];}
+function edItem(){const seg=ED.cur;return seg&&seg.items?seg.items.find(it=>it.key===ED.key):null;}
+function drawEditor(){
+  const cv=$('#out'),ctx=cv.getContext('2d');const seg=edSeg();ED.cur=seg;
+  drawSegment(ctx,seg,seg.type==='intro'?2.4:1.6);
+  const it=edItem();
+  if(it&&!it.hidden&&it.box.h>0){const b=it.box,p=10;ctx.save();ctx.lineWidth=4;ctx.setLineDash([14,10]);ctx.strokeStyle='#FFFFFF';ctx.strokeRect(b.x-p,b.y-p,b.w+2*p,b.h+2*p);
+    ctx.strokeStyle='#0F766E';ctx.lineDashOffset=12;ctx.strokeRect(b.x-p,b.y-p,b.w+2*p,b.h+2*p);ctx.restore();}
+}
+function renderEditor(){
+  $('#editPanel').hidden=!ED.on;$('#outFrame').classList.toggle('editing',ED.on);
+  $('#editToggle').setAttribute('aria-pressed',String(ED.on));$('#editToggle').lastChild.textContent=ED.on?' 完成編輯':' 編輯影片上的文字';
+  if(!ED.on)return;
+  const segs=buildSegments();
+  $('#segPick').innerHTML=segs.slice(0,-1).map((sg,i)=>'<button type="button" class="chip" data-action="ed-seg" data-i="'+i+'" aria-pressed="'+(i===ED.seg)+'">'+(sg.type==='intro'?'片頭':i+'. '+esc((sg.clip.place||'未命名').slice(0,6)))+'</button>').join('');
+  drawEditor();
+  const items=ED.cur.items||[];
+  if(ED.key&&!items.some(it=>it.key===ED.key))ED.key=null;
+  $('#itemPick').innerHTML=items.map(it=>'<button type="button" class="chip'+(it.hidden?' gone':'')+'" data-action="ed-item" data-k="'+it.key+'" aria-pressed="'+(it.key===ED.key)+'">'+LABELS[it.key]+(it.hidden?'（已刪除）':'')+'</button>').join('');
+  const it=edItem();$('#itemEditor').hidden=!it;if(!it)return;
+  const ov=segOv(ED.cur)[it.key]||{};
+  const ta=$('#edText');
+  ta.value=it.key==='note'?(ED.cur.clip.note||''):(it.type==='chips'?(it.text||[]).join('\n'):String(it.text||''));
+  $('#edHint').textContent=it.type==='chips'?'每一行是一個標籤。':(it.key==='note'?'這段文字也會同步到第 1、3 步的心情短文。':'清空文字或按「刪除這段文字」就不會顯示。');
+  const col=(ov.color||it.color||'').toUpperCase();
+  $('#edColors').innerHTML=SWATCHES.map(([c,n])=>'<button type="button" class="swatch" data-action="ed-color" data-c="'+c+'" style="background:'+c+'" aria-label="'+n+'" aria-pressed="'+(col===c)+'"></button>').join('')+'<label class="colorpick"><span class="vh">自訂顏色</span><input type="color" id="edColorCustom" value="'+(/^#[0-9A-F]{6}$/.test(col)?col.toLowerCase():'#ffffff')+'"></label>';
+  const sc=Math.round((ov.scale||1)*100);$('#edSize').value=sc;$('#edSizeVal').textContent=sc+'%';
+  $('#edFont').innerHTML=Object.entries(FONTS).map(([k,f])=>'<button type="button" data-action="ed-font" data-f="'+k+'" aria-pressed="'+(it.font===k)+'" style="font-family:'+f.fam.replace(/"/g,'&quot;')+'">'+f.label+'</button>').join('');
+  $('#edHide').textContent=it.hidden?'顯示這段文字':'刪除這段文字';
+  $('#edAll').hidden=ED.cur.type!=='clip';
+}
+function edSet(patch){const ov=segOv(ED.cur);ov[ED.key]=Object.assign({},ov[ED.key]||{},patch);drawEditor();}
+async function edFont(k){const f=FONTS[k];edSet({font:k});renderEditor();
+  if(document.fonts&&document.fonts.load){const txt=(ED.cur.items||[]).map(it=>Array.isArray(it.text)?it.text.join(''):it.text).join('');
+    try{await Promise.all([document.fonts.load('700 40px '+f.fam,txt),document.fonts.load('400 40px '+f.fam,txt)]);}catch(e){}drawEditor();}}
+function canvasPt(e){const r=$('#out').getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};}
+(function(){
+  const cv=$('#out');
+  cv.addEventListener('pointerdown',e=>{if(!ED.on||run)return;const p=canvasPt(e);const items=(ED.cur&&ED.cur.items)||[];
+    const hit=items.slice().reverse().find(it=>!it.hidden&&it.box.h>0&&p.x>=it.box.x-18&&p.x<=it.box.x+it.box.w+18&&p.y>=it.box.y-18&&p.y<=it.box.y+it.box.h+18);
+    if(!hit){ED.key=null;renderEditor();return;}
+    ED.key=hit.key;const o=segOv(ED.cur)[hit.key]||{};ED.drag={sx:p.x,sy:p.y,dx:o.dx||0,dy:o.dy||0,id:e.pointerId,moved:false};
+    cv.setPointerCapture(e.pointerId);e.preventDefault();renderEditor();});
+  cv.addEventListener('pointermove',e=>{const d=ED.drag;if(!d||e.pointerId!==d.id)return;const p=canvasPt(e);
+    const nx=Math.round(d.dx+p.x-d.sx),ny=Math.round(d.dy+p.y-d.sy);if(Math.abs(p.x-d.sx)+Math.abs(p.y-d.sy)>4)d.moved=true;if(d.moved)edSet({dx:nx,dy:ny});});
+  const up=e=>{const d=ED.drag;if(!d||e.pointerId!==d.id)return;ED.drag=null;if(d.moved)setStatus('#edStatus','已移動「'+LABELS[ED.key]+'」。');};
+  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+})();
+$('#edText').addEventListener('input',e=>{const it=edItem();if(!it)return;const v=e.target.value;
+  if(it.key==='note'){ED.cur.clip.note=v;drawEditor();}
+  else if(it.type==='chips')edSet({text:v.split('\n')});
+  else edSet({text:v});});
+$('#genBpm').addEventListener('input',e=>{const v=+e.target.value;if(S.music.gen.ai)S.music.gen.ai.bpm=v;else S.music.gen.bpm=v;$('#genBpmVal').textContent=v+' BPM';$('#musicNow').textContent=musicLabel();});
+$('#genBpm').addEventListener('change',()=>stopAudition());
+$('#musicVol').addEventListener('input',e=>{S.music.vol=+e.target.value;$('#volVal').textContent=S.music.vol+'%';if(audition)audition.gain.gain.value=S.music.vol/100;});
+$('#musicFile').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)loadMusicFile(f);e.target.value='';});
+$('#musicOffset').addEventListener('change',e=>{if(S.music.up){S.music.up.offset=Math.max(0,+e.target.value||0);stopAudition();}});
+$('#edSize').addEventListener('input',e=>{const v=+e.target.value;$('#edSizeVal').textContent=v+'%';edSet({scale:v/100});});
+document.addEventListener('input',e=>{if(e.target.id==='edColorCustom'){edSet({color:e.target.value.toUpperCase()});}});
+document.addEventListener('change',e=>{if(e.target.id==='edColorCustom')document.querySelectorAll('#edColors .swatch').forEach(x=>x.setAttribute('aria-pressed','false'));});
+
+/* ---------- music: synthesized offline, played live, recorded with the video ---------- */
+const PRESETS={
+  piano:{name:'溫暖鋼琴',inst:'piano',bpm:84,mode:'major',root:0,prog:['I','V','vi','IV'],drums:'none',arp:'up',mel:.7},
+  guitar:{name:'輕快木吉他',inst:'pluck',bpm:108,mode:'major',root:2,prog:['I','IV','vi','V'],drums:'light',arp:'strum',mel:.6},
+  lofi:{name:'Lo-fi 午後',inst:'epiano',bpm:80,mode:'major',root:5,prog:['ii','V','I','vi'],drums:'lofi',arp:'chord',mel:.5},
+  strings:{name:'電影弦樂',inst:'strings',bpm:70,mode:'minor',root:9,prog:['i','VI','III','VII'],drums:'boom',arp:'pad',mel:.55},
+  edm:{name:'電子節拍',inst:'synth',bpm:124,mode:'minor',root:7,prog:['i','VI','III','VII'],drums:'four',arp:'pulse',mel:.6},
+  marimba:{name:'搞笑木琴',inst:'marimba',bpm:132,mode:'major',root:0,prog:['I','vi','IV','V'],drums:'bounce',arp:'bounce',mel:.8},
+  ambient:{name:'紀錄片氛圍',inst:'pad',bpm:72,mode:'minor',root:4,prog:['i','iv','VI','v'],drums:'none',arp:'pad',mel:.35}
+};
+const STYLE_MUSIC={'微電影':'strings','紀錄片':'ambient','生活訪談':'piano','MG動畫':'edm','談式廣告':'guitar','短影音社群':'guitar','TikTok':'edm','品牌形象':'piano','搞笑娛樂':'marimba','客戶見證':'piano','產品形象':'lofi'};
+const GEN_MOODS={'溫暖':{mode:'major',prog:['I','V','vi','IV'],drums:'none',arp:'up',mel:.7},'輕快':{mode:'major',prog:['I','IV','vi','V'],drums:'light',arp:'strum',mel:.65},
+  '熱血':{mode:'minor',prog:['i','VI','III','VII'],drums:'four',arp:'pulse',mel:.6},'感性':{mode:'major',prog:['vi','IV','I','V'],drums:'none',arp:'pad',mel:.6},
+  '搞笑':{mode:'major',prog:['I','vi','IV','V'],drums:'bounce',arp:'bounce',mel:.8},'神秘':{mode:'minor',prog:['i','iv','VI','v'],drums:'boom',arp:'pad',mel:.4},'慵懶':{mode:'major',prog:['ii','V','I','vi'],drums:'lofi',arp:'chord',mel:.5}};
+const GEN_INST=[['piano','鋼琴'],['pluck','撥弦吉他'],['epiano','電鋼琴'],['strings','弦樂'],['synth','合成器'],['marimba','木琴'],['pad','氛圍鋪底']];
+const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function musicCfg(){const m=S.music;
+  if(m.mode==='preset'){const k=m.preset||STYLE_MUSIC[S.style]||'piano';return Object.assign({key:k,seed:7},PRESETS[k]);}
+  if(m.mode==='gen'){if(m.gen.ai)return Object.assign({seed:m.gen.seed},m.gen.ai);const base=GEN_MOODS[m.gen.mood]||GEN_MOODS['溫暖'];
+    return Object.assign({},base,{name:m.gen.mood+'・'+(GEN_INST.find(x=>x[0]===m.gen.inst)||[0,''])[1],inst:m.gen.inst,bpm:m.gen.bpm,root:(m.gen.seed*5)%12,seed:m.gen.seed});}
+  return null;}
+function musicLabel(){const m=S.music;if(m.mode==='none')return'無音樂';if(m.mode==='upload')return m.up?m.up.name:'尚未選擇音樂檔';
+  const c=musicCfg();return c.name+'・'+c.bpm+' BPM';}
+const ROMAN={i:0,ii:1,iii:2,iv:3,v:4,vi:5,vii:6};
+function mtof(m){return 440*Math.pow(2,(m-69)/12);}
+function env(g,t,a,d,s,r,dur,peak){const hold=Math.max(dur,a+d+.01),sus=Math.max(peak*s,.0002);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(sus,t+a+d);g.gain.setValueAtTime(sus,t+hold);g.gain.exponentialRampToValueAtTime(.0001,t+hold+r);return t+hold+r+.05;}
+function playNote(ac,out,inst,t,m,dur,vel){
+  const f=mtof(m),g=ac.createGain();g.connect(out);
+  const osc=(type,det,mul)=>{const o=ac.createOscillator();o.type=type;o.frequency.value=f*(mul||1);o.detune.value=det||0;return o;};
+  const lp=(fr,q)=>{const x=ac.createBiquadFilter();x.type='lowpass';x.frequency.value=fr;x.Q.value=q||.7;x.connect(g);return x;};
+  const sub=(o,amt,dst)=>{const k=ac.createGain();k.gain.value=amt;o.connect(k);k.connect(dst);};
+  let os=[],end;
+  if(inst==='piano'){const a=osc('triangle',0),b=osc('sine',3,2);a.connect(g);sub(b,.22,g);os=[a,b];end=env(g,t,.005,.5,.22,.7,dur,vel*.45);}
+  else if(inst==='epiano'){const a=osc('sine',0),b=osc('sine',2,3);a.connect(g);sub(b,.14,g);os=[a,b];end=env(g,t,.01,.7,.3,.6,dur,vel*.48);}
+  else if(inst==='pluck'){const x=lp(f*7,1);x.frequency.setValueAtTime(f*7,t);x.frequency.exponentialRampToValueAtTime(f*1.4,t+.35);const a=osc('sawtooth',0),b=osc('square',6);a.connect(x);sub(b,.25,x);os=[a,b];end=env(g,t,.003,.28,.12,.25,Math.min(dur,.3),vel*.32);}
+  else if(inst==='marimba'){const a=osc('sine',0),b=osc('sine',0,4);a.connect(g);const k=ac.createGain();k.gain.setValueAtTime(.35,t);k.gain.exponentialRampToValueAtTime(.001,t+.07);b.connect(k);k.connect(g);os=[a,b];end=env(g,t,.002,.2,.04,.12,.04,vel*.55);}
+  else if(inst==='synth'){const x=lp(2400,3);const a=osc('sawtooth',-9),b=osc('sawtooth',9);a.connect(x);b.connect(x);os=[a,b];end=env(g,t,.008,.15,.5,.12,dur,vel*.2);}
+  else if(inst==='bass'){const x=lp(420,.9);const a=osc('triangle',0),b=osc('sawtooth',0);a.connect(x);sub(b,.22,x);os=[a,b];end=env(g,t,.01,.25,.55,.12,dur,vel*.5);}
+  else{const pad=inst==='pad';const x=lp(pad?900:1900,.8);[osc('sawtooth',-11),osc('sawtooth',11),osc(pad?'triangle':'sawtooth',0,.5)].forEach(o=>{o.connect(x);os.push(o);});end=env(g,t,pad?.9:.35,.3,.8,pad?1.6:.8,dur,vel*(pad?.1:.11));}
+  os.forEach(o=>{o.start(t);o.stop(end);});
+}
+let noiseBuf=null;
+function noise(ac){if(noiseBuf&&noiseBuf.sampleRate===ac.sampleRate)return noiseBuf;const b=ac.createBuffer(1,ac.sampleRate,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return noiseBuf=b;}
+function kick(ac,out,t,v){const o=ac.createOscillator(),g=ac.createGain();o.frequency.setValueAtTime(140,t);o.frequency.exponentialRampToValueAtTime(42,t+.12);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+.35);o.connect(g);g.connect(out);o.start(t);o.stop(t+.4);}
+function nz(ac,out,t,v,type,fr,dec){const s=ac.createBufferSource();s.buffer=noise(ac);const f=ac.createBiquadFilter();f.type=type;f.frequency.value=fr;const g=ac.createGain();g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+dec);s.connect(f);f.connect(g);g.connect(out);s.start(t,Math.random()*.5);s.stop(t+dec+.02);}
+function snare(ac,out,t,v){nz(ac,out,t,v,'bandpass',1800,.18);}
+function hat(ac,out,t,v){nz(ac,out,t,v,'highpass',7000,.05);}
+function impulse(ac,sec){const len=Math.round(ac.sampleRate*sec),b=ac.createBuffer(2,len,ac.sampleRate);for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6);}return b;}
+function compose(ac,cfg,total){
+  const out=ac.createGain();const comp=ac.createDynamicsCompressor();out.connect(comp);comp.connect(ac.destination);
+  out.gain.setValueAtTime(0,0);out.gain.linearRampToValueAtTime(.9,Math.min(1.2,total/4));out.gain.setValueAtTime(.9,Math.max(1.3,total-2.8));out.gain.linearRampToValueAtTime(0,total);
+  const bus=ac.createGain();bus.connect(out);const conv=ac.createConvolver();conv.buffer=impulse(ac,2.4);const wet=ac.createGain();wet.gain.value=['pad','strings'].includes(cfg.inst)?.5:.24;bus.connect(conv);conv.connect(wet);wet.connect(out);
+  const drums=ac.createGain();drums.gain.value=.9;drums.connect(out);
+  const spb=60/cfg.bpm,bar=spb*4,sc=cfg.mode==='minor'?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11],root=48+((cfg.root||0)%12);
+  const nt=(deg,oct)=>root+12*(oct+Math.floor(deg/7))+sc[((deg%7)+7)%7];
+  const prog=(cfg.prog||['I','V','vi','IV']).map(x=>ROMAN[String(x).toLowerCase().replace(/[^iv]/g,'')]||0);
+  const r=rng((cfg.seed||1)*7919+cfg.bpm);
+  const pats=cfg.mel<.5?[[[0,4]],[[0,2],[2,2]],[[0,3],[3,1]]]:[[[0,1],[1,.5],[1.5,.5],[2,2]],[[0,1.5],[1.5,.5],[2,1],[3,1]],[[0,.5],[.5,.5],[1,1],[2,1],[3,1]],[[0,2],[2,1],[3,1]],[[.5,.5],[1,1],[2,.5],[2.5,1.5]],[[0,1],[1,1],[2,1],[3,.5],[3.5,.5]]];
+  const melInst={strings:'strings',pad:'piano',synth:'synth',pluck:'pluck',marimba:'marimba',epiano:'epiano',piano:'piano'}[cfg.inst]||'piano';
+  const accInst=cfg.inst;let md=7+prog[0];let pat=pats[0];
+  const bars=Math.ceil(total/bar)+1;
+  for(let b=0;b<bars;b++){
+    const t0=b*bar;if(t0>=total)break;const ch=prog[b%prog.length],tones=[ch,ch+2,ch+4],last=t0+bar>=total-.5;
+    const A=(deg,o,t,d,v)=>playNote(ac,bus,accInst,t,nt(deg,o),d,v);
+    if(cfg.arp==='pad')tones.forEach(d=>A(d,1,t0,bar*.98,.7));
+    else if(cfg.arp==='chord'){[0,2].forEach(k=>tones.forEach(d=>A(d,1,t0+k*spb+(cfg.drums==='lofi'?.02:0),spb*1.7,.55)));}
+    else if(cfg.arp==='up'){const seq=[ch,ch+2,ch+4,ch+7,ch+4,ch+2,ch+4,ch+7];seq.forEach((d,k)=>A(d,1,t0+k*spb/2,spb*.9,.5));}
+    else if(cfg.arp==='strum'){[[0,1],[1.5,.6],[2,.9],[2.5,.6],[3.5,.6]].forEach(([bt,v])=>tones.concat([ch+7]).forEach((d,k)=>A(d,1,t0+bt*spb+k*.018,spb*.6,v*.8)));}
+    else if(cfg.arp==='pulse'){for(let k=0;k<8;k++)tones.forEach(d=>A(d,1,t0+k*spb/2,spb*.35,.45));}
+    else if(cfg.arp==='bounce'){[.5,1.5,2.5,3.5].forEach(bt=>tones.forEach(d=>A(d,1,t0+bt*spb,spb*.3,.5)));}
+    if(cfg.arp==='pad')playNote(ac,bus,'bass',t0,nt(ch,-1),bar*.95,.6);
+    else [0,2].forEach(k=>playNote(ac,bus,'bass',t0+k*spb,nt(ch,-1),spb*(cfg.drums==='four'?.9:1.8),.65));
+    if(b>=1&&!last&&r()<cfg.mel+.25){
+      if(b%2===1)pat=pats[Math.floor(r()*pats.length)];
+      pat.forEach(([bt,ln])=>{const strong=bt===0||bt===2;let next=md+[-2,-1,-1,1,1,2][Math.floor(r()*6)];
+        if(strong){const ct=[ch+7,ch+9,ch+11,ch+14];next=ct.reduce((a,c)=>Math.abs(c-next)<Math.abs(a-next)?c:a,ct[0]);}
+        md=clamp(next,5,17);playNote(ac,bus,melInst,t0+bt*spb,nt(md,1),ln*spb*.95,.75+r()*.15);});
+    }
+    if(last){tones.forEach(d=>A(d,1,t0,Math.max(.5,total-t0),.5));}
+    const D=cfg.drums;if(b<1||last||D==='none')continue;
+    for(let k=0;k<8;k++){const t=t0+k*spb/2,beat=k/2,sw=(D==='lofi'&&k%2)?spb*.08:0;
+      if(D==='four'){if(k%2===0)kick(ac,drums,t,.8);else hat(ac,drums,t,.14);if(k===2||k===6)snare(ac,drums,t,.32);}
+      else if(D==='light'){hat(ac,drums,t+sw,.07);if(k===0||k===4)kick(ac,drums,t,.45);}
+      else if(D==='lofi'){hat(ac,drums,t+sw,.05);if(k===0||k===5)kick(ac,drums,t,.5);if(k===2||k===6)snare(ac,drums,t,.18);}
+      else if(D==='bounce'){hat(ac,drums,t,.06);if(k===0||k===4)kick(ac,drums,t,.55);if(k===2||k===6)snare(ac,drums,t,.28);}
+      else if(D==='boom'&&k===0&&b%2===0)kick(ac,drums,t,.7);}
+  }
+}
+let musicCache={key:'',buf:null};
+async function buildMusic(total){
+  const m=S.music;if(m.mode==='none')return null;
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;if(!OAC)return null;
+  total=Math.max(4,Math.ceil(total));
+  const key=JSON.stringify([m.mode,m.mode==='upload'?(m.up&&m.up.id)+':'+m.up.offset:musicCfg(),total]);
+  if(musicCache.key===key)return musicCache.buf;
+  const sr=44100,ac=new OAC(2,sr*total,sr);
+  if(m.mode==='upload'){if(!m.up||!m.up.buffer)return null;
+    const src=ac.createBufferSource();src.buffer=m.up.buffer;src.loop=true;const g=ac.createGain();src.connect(g);g.connect(ac.destination);
+    g.gain.setValueAtTime(0,0);g.gain.linearRampToValueAtTime(1,.6);g.gain.setValueAtTime(1,Math.max(.7,total-2.8));g.gain.linearRampToValueAtTime(0,total);
+    src.start(0,Math.min(m.up.offset||0,Math.max(0,m.up.buffer.duration-1)));}
+  else compose(ac,musicCfg(),total);
+  const buf=await ac.startRendering();musicCache={key,buf};return buf;
+}
+let actx=null;
+function audioCtx(){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;if(!actx)actx=new AC();if(actx.state==='suspended')actx.resume().catch(()=>{});return actx;}
+function startMusic(buf,dest){const ac=audioCtx();if(!ac||!buf)return null;const src=ac.createBufferSource();src.buffer=buf;const g=ac.createGain();g.gain.value=S.music.vol/100;src.connect(g);g.connect(ac.destination);if(dest)g.connect(dest);src.start();
+  return{stop(){try{src.stop();}catch(e){}},gain:g,src};}
+let audition=null;
+async function toggleAudition(){
+  if(audition){audition.stop();audition=null;$('#mPlayBtn').textContent='試聽';setStatus('#mStatus','');return;}
+  const ac=audioCtx();if(!ac){setStatus('#mStatus','這個瀏覽器不支援播放音樂。',true);return;}
+  if(S.music.mode==='none')return;if(S.music.mode==='upload'&&!S.music.up){setStatus('#mStatus','請先選擇音樂檔。',true);return;}
+  setStatus('#mStatus','準備音樂中…');$('#mPlayBtn').disabled=true;
+  let buf=null;try{buf=await buildMusic(totalLen());}catch(e){}
+  $('#mPlayBtn').disabled=false;
+  if(!buf){setStatus('#mStatus','音樂產生失敗，請換一個選項再試。',true);return;}
+  audition=startMusic(buf);$('#mPlayBtn').textContent='停止試聽';setStatus('#mStatus','播放中：'+musicLabel());
+  audition.src.onended=()=>{if(audition){audition=null;$('#mPlayBtn').textContent='試聽';setStatus('#mStatus','');}};
+}
+function stopAudition(){if(audition){audition.stop();audition=null;$('#mPlayBtn').textContent='試聽';setStatus('#mStatus','');}}
+function renderMusic(){
+  const m=S.music;
+  $('#musicMode').innerHTML=[['none','無音樂'],['preset','內建配樂'],['gen','生成音樂'],['upload','上傳音樂']].map(([k,l])=>'<button type="button" data-action="m-mode" data-v="'+k+'" aria-pressed="'+(m.mode===k)+'">'+l+'</button>').join('');
+  $('#mPreset').hidden=m.mode!=='preset';$('#mGen').hidden=m.mode!=='gen';$('#mUpload').hidden=m.mode!=='upload';$('#mVol').hidden=m.mode==='none';
+  $('#musicNow').textContent=musicLabel();
+  const auto=STYLE_MUSIC[S.style],cur=m.preset||auto;
+  $('#presetChips').innerHTML=Object.entries(PRESETS).map(([k,p])=>'<button type="button" class="chip" data-action="m-preset" data-v="'+k+'" aria-pressed="'+(cur===k)+'">'+p.name+(k===auto?'（適合'+S.style+'）':'')+'</button>').join('');
+  $('#genMood').innerHTML=Object.keys(GEN_MOODS).map(k=>'<button type="button" class="chip" data-action="g-mood" data-v="'+k+'" aria-pressed="'+(!m.gen.ai&&m.gen.mood===k)+'">'+k+'</button>').join('');
+  $('#genInst').innerHTML=GEN_INST.map(([k,l])=>'<button type="button" class="chip" data-action="g-inst" data-v="'+k+'" aria-pressed="'+(!m.gen.ai&&m.gen.inst===k)+'">'+l+'</button>').join('');
+  $('#genBpm').value=m.gen.ai?m.gen.ai.bpm:m.gen.bpm;$('#genBpmVal').textContent=$('#genBpm').value+' BPM';
+  $('#genAiBtn').hidden=!sampleFn;
+  $('#musicVol').value=m.vol;$('#volVal').textContent=m.vol+'%';
+  $('#musicFileName').textContent=m.up?m.up.name+'（'+fmtDur(m.up.buffer.duration)+'）':'尚未選擇';
+  $('#musicOffset').value=m.up?m.up.offset:0;
+}
+function musicChanged(){stopAudition();renderMusic();}
+async function aiCompose(){
+  if(!sampleFn)return;const btn=$('#genAiBtn');btn.disabled=true;setStatus('#genStatus','AI 作曲中…');
+  const prompt='你是配樂設計師。請依照這趟旅行的內容，為一部 '+Math.round(totalLen())+' 秒的旅遊影片設計背景音樂的參數。只回傳一個 JSON 物件，格式：{"title":"四到八個字的中文曲名","bpm":60到140的整數,"key":"C、C#、D、D#、E、F、F#、G、G#、A、A# 或 B","mode":"major 或 minor","progression":["I","V","vi","IV"]（4 個羅馬數字和弦，用大小寫表示大小調和弦）,"instrument":"piano、pluck、epiano、strings、synth、marimba 或 pad","pattern":"up、strum、chord、pad、pulse 或 bounce","drums":"none、light、lofi、boom、four 或 bounce"}。\n影片風格：'+S.style+'\n地點：'+(placeTitle()||'未填')+'\n旅伴：'+(S.companions.join('、')||'一個人')+'\n心情：'+(S.moods.join('、')||'未填')+'\n天氣：'+Object.values(S.weather).map(w=>w&&w.cond).filter(Boolean).join('、')+'\n各段心情短文：'+S.clips.map(c=>c.note).filter(Boolean).join(' / ').slice(0,600);
+  try{const r=await sampleFn.json(prompt,{modelTier:'default',cache:false});
+    const inst=GEN_INST.some(x=>x[0]===r.instrument)?r.instrument:'piano',pat=['up','strum','chord','pad','pulse','bounce'].includes(r.pattern)?r.pattern:'up',dr=['none','light','lofi','boom','four','bounce'].includes(r.drums)?r.drums:'none';
+    const prog=Array.isArray(r.progression)&&r.progression.length?r.progression.slice(0,8).map(String):['I','V','vi','IV'];
+    S.music.gen.ai={name:String(r.title||'AI 旅行曲').slice(0,12),inst,bpm:clamp(Math.round(+r.bpm)||96,60,140),mode:r.mode==='minor'?'minor':'major',root:Math.max(0,KEYS.indexOf(String(r.key||'C').toUpperCase())),prog,arp:pat,drums:dr,mel:pat==='pad'?.45:.65};
+    S.music.gen.seed++;setStatus('#genStatus','AI 寫好了「'+S.music.gen.ai.name+'」，按試聽聽聽看。改選氣氛或樂器會回到手動設定。');}
+  catch(e){setStatus('#genStatus',e&&e.code==='not_granted'?'沒有開放 AI 功能，可以手動選氣氛和樂器。':'AI 暫時無法作曲，請稍後再試。',true);if(e&&(e.code==='not_granted'||e.code==='sampling_disabled')){sampleFn=null;refreshCaps();}}
+  btn.disabled=false;musicChanged();
+}
+async function loadMusicFile(f){
+  if(!f)return;stopAudition();setStatus('#uploadStatus','讀取音樂中…');
+  const ac=audioCtx();if(!ac){setStatus('#uploadStatus','這個瀏覽器不支援播放音樂。',true);return;}
+  try{const arr=await f.arrayBuffer();const buf=await new Promise((res,rej)=>{const p=ac.decodeAudioData(arr,res,rej);if(p&&p.then)p.then(res,rej);});
+    S.music.up={id:++uid,name:f.name,buffer:buf,offset:0};setStatus('#uploadStatus','已載入「'+f.name+'」。音樂比影片短時會自動重複，結尾會自動淡出。');}
+  catch(e){setStatus('#uploadStatus','無法讀取這個音樂檔，請改用 MP3、M4A 或 WAV。',true);}
+  musicChanged();
+}
+
+/* ---------- play / record ---------- */
+let run=null,resultBlob=null,resultType='';
+function pickMime(audio){const list=audio?['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']:['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return'';return list.find(m=>MediaRecorder.isTypeSupported(m))||'';}
+async function loadFonts(){if(!document.fonts||!document.fonts.load)return;
+  const txt=[placeTitle(),S.clips.map(c=>c.note||'').join(''),S.moods.join(''),S.companions.join(''),S.clips.map(c=>c.place+c.city+c.country).join(''),'旅行日記足跡天段回憶約公里範例畫面與未取得定位路線為示意0123456789.°C·—–晴多雲陰小雨陣雷雪霧時'].join('');
+  try{await Promise.all([document.fonts.load('700 40px "Noto Sans TC"',txt),document.fonts.load('500 40px "Noto Sans TC"',txt),document.fonts.load('400 40px "Noto Sans TC"',txt),VSTYLE[S.style].tf==='serif'?document.fonts.load('700 40px "Noto Serif TC"',txt):null]);}catch(e){}
+  const used=new Set();[S.introOv||{}].concat(S.clips.map(c=>c.ov||{})).forEach(ov=>Object.values(ov).forEach(o=>{if(o&&o.font)used.add(o.font);}));
+  const extra=[...used].map(k=>FONTS[k]&&FONTS[k].fam).filter(Boolean);
+  const etxt=txt+[S.introOv||{}].concat(S.clips.map(c=>c.ov||{})).map(ov=>Object.values(ov).map(o=>o&&o.text?(Array.isArray(o.text)?o.text.join(''):o.text):'').join('')).join('');
+  try{await Promise.all(extra.flatMap(f=>[document.fonts.load('700 40px '+f,etxt),document.fonts.load('400 40px '+f,etxt)]));}catch(e){}}
+function setBusy(b){if(b&&ED.on){$('#outFrame').classList.remove('editing');}['#previewBtn','#renderBtn','#prevBtn','#editToggle'].forEach(id=>{$(id).disabled=b;});$('#stopBtn').hidden=!b;
+  document.querySelectorAll('#steps button').forEach(x=>{x.disabled=b;});}
+async function runTimeline(record){
+  if(run||!S.clips.length)return;
+  run={stop:false};setBusy(true);stopAudition();
+  const ac=S.music.mode!=='none'?audioCtx():null;
+  const segs=buildSegments(),cv=$('#out'),ctx=cv.getContext('2d');
+  setStatus('#renderStatus','準備影片中…');
+  const holder=$('#holder');
+  for(const s of segs){if(s.type!=='clip'||s.clip.kind!=='file')continue;
+    const v=document.createElement('video');v.muted=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='auto';v.src=s.clip.url;holder.append(v);
+    await once(v,'loadedmetadata',8000);v.currentTime=s.start;await once(v,'seeked',8000);s.video=v;}
+  await loadFonts();
+  let mbuf=null;if(ac){setStatus('#renderStatus','準備背景音樂中…');try{mbuf=await buildMusic(segs.reduce((a,s)=>a+s.dur,0));}catch(e){mbuf=null;}}
+  const mdest=ac&&mbuf&&record&&ac.createMediaStreamDestination?ac.createMediaStreamDestination():null;
+  let rec=null,chunks=[],mime='',player=null;
+  if(record){
+    if(!cv.captureStream||!window.MediaRecorder){setStatus('#renderStatus','這個瀏覽器不支援在網頁裡錄製影片。請改用 iPhone 的 Safari 或電腦版 Chrome。',true);cleanup(segs);return;}
+    mime=pickMime(!!mdest);
+    try{const vs=cv.captureStream(30);const stream=mdest?new MediaStream(vs.getVideoTracks().concat(mdest.stream.getAudioTracks())):vs;rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:6000000}:{videoBitsPerSecond:6000000});}
+    catch(e){setStatus('#renderStatus','無法開始錄製：'+(e&&e.message||'不明原因'),true);cleanup(segs);return;}
+    rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};rec.start(500);
+  }
+  let lock=null;try{if(navigator.wakeLock)lock=await navigator.wakeLock.request('screen');}catch(e){}
+  const total=segs.reduce((a,s)=>a+s.dur,0);let done=0;
+  setStatus('#renderStatus',record?'剪輯中，請讓畫面保持開啟…':'預覽播放中…');
+  if(mbuf)player=startMusic(mbuf,mdest);
+  const snaps=[document.createElement('canvas'),document.createElement('canvas')];snaps.forEach(x=>{x.width=W;x.height=H;});let si=0,prevSnap=null;
+  for(const s of segs){if(run.stop)break;s.prev=prevSnap;await playSeg(ctx,s,lt=>{$('#prog').style.width=((done+lt)/total*100).toFixed(1)+'%';});done+=s.dur;
+    const sn=snaps[si];si=1-si;sn.getContext('2d').drawImage(cv,0,0);prevSnap=sn;}
+  if(player)player.stop();
+  if(rec){const stopped=new Promise(r=>{rec.onstop=r;});rec.stop();await stopped;
+    if(!run.stop){resultType=(rec.mimeType||mime||'video/webm').split(';')[0];resultBlob=new Blob(chunks,{type:resultType});
+      const v=$('#result');if(v.src)URL.revokeObjectURL(v.src);v.src=URL.createObjectURL(resultBlob);$('#resultCard').hidden=false;
+      setStatus('#saveStatus','');setStatus('#renderStatus','完成！影片長度約 '+Math.round(total)+' 秒，格式 '+(resultType.includes('mp4')?'MP4':'WebM')+'。');}
+    else setStatus('#renderStatus','已停止剪輯。');}
+  else setStatus('#renderStatus',run.stop?'已停止預覽。':'預覽結束。');
+  try{lock&&lock.release();}catch(e){}
+  cleanup(segs);
+}
+function cleanup(segs){segs.forEach(s=>{if(s.video){s.video.pause();s.video.removeAttribute('src');s.video.load();s.video.remove();}});run=null;setBusy(false);renderNav();if(ED.on)renderEditor();}
+function playSeg(ctx,s,onT){return new Promise(res=>{
+  const st=VSTYLE[S.style];
+  if(s.video){try{s.video.playbackRate=st.speed==='ramp'?1.7:(st.speed||1);}catch(e){}s.video.play().catch(()=>{});}
+  let slowed=false;
+  const t0=performance.now();
+  const tick=()=>{const lt=(performance.now()-t0)/1000;
+    if(s.video&&st.speed==='ramp'&&!slowed&&lt>s.dur*.4){slowed=true;try{s.video.playbackRate=.6;}catch(e){}}
+    drawSegment(ctx,s,Math.min(lt,s.dur));onT(Math.min(lt,s.dur));
+    if(lt>=s.dur||run.stop){if(s.video)s.video.pause();res();}else requestAnimationFrame(tick);};
+  tick();});}
+async function saveResult(){
+  if(!resultBlob)return;
+  const name='旅遊影片-'+(tripDays()[0]||ymdOf(new Date()))+'.'+(resultType.includes('mp4')?'mp4':'webm');
+  if(dl){try{await dl.save({filename:name,data:resultBlob});setStatus('#saveStatus','已存檔：'+name);}
+    catch(e){setStatus('#saveStatus',e&&e.code==='declined'?'已取消存檔。':(e&&e.code==='rate_limited'?'存檔視窗已開啟，請先處理它。':'這裡無法存檔，可以長按上方影片儲存。'),e&&e.code!=='declined');}return;}
+  if(!window.claude){
+    try{const file=new File([resultBlob],name,{type:resultType||'video/mp4'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'旅遊影片'});setStatus('#saveStatus','已開啟分享選單，選「儲存影片」就會存進相簿。');return;}}
+    catch(e){if(e&&e.name==='AbortError'){setStatus('#saveStatus','已取消。');return;}}
+    const a=document.createElement('a');a.href=URL.createObjectURL(resultBlob);a.download=name;document.body.append(a);a.click();a.remove();setStatus('#saveStatus','已開始下載：'+name);return;}
+  setStatus('#saveStatus','這裡無法存檔，可以長按上方影片儲存。',true);
+}
+
+/* ---------- auto place names / weather / AI text ---------- */
+/* ---------- place names: Google (own site + key) → AI (in Claude) → free services ---------- */
+let gKey='';try{gKey=localStorage.getItem('tv_gkey')||'';}catch(e){}
+let gReady=null;
+function canGoogle(){return !!gKey&&!window.claude;}
+function loadGoogle(){
+  if(gReady)return gReady;
+  gReady=new Promise((res,rej)=>{
+    if(window.google&&window.google.maps&&window.google.maps.Geocoder){res(window.google.maps);return;}
+    const to=setTimeout(()=>{gReady=null;rej(new Error('timeout'));},12000);
+    window.__gmInit=()=>{clearTimeout(to);res(window.google.maps);};
+    window.gm_authFailure=()=>{gReady=null;setStatus('#gKeyStatus','Google 金鑰無法使用，請確認金鑰正確、已啟用 Maps JavaScript API、Geocoding API 和 Places API (New)。',true);};
+    const sc=document.createElement('script');sc.async=true;
+    sc.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(gKey)+'&v=weekly&language=zh-TW&region=TW&libraries=places&callback=__gmInit';
+    sc.onerror=()=>{clearTimeout(to);gReady=null;rej(new Error('load'));};document.head.append(sc);});
+  return gReady;
+}
+async function googleReverse(lat,lon){
+  const gm=await loadGoogle();const r=await new gm.Geocoder().geocode({location:{lat,lng:lon},language:'zh-TW'});const res=(r&&r.results)||[];
+  const comp=t=>{for(const x of res)for(const c of x.address_components)if(c.types.includes(t))return c.long_name;return'';};
+  let place='';
+  try{if(gm.places&&gm.places.Place&&gm.places.Place.searchNearby){const out=await gm.places.Place.searchNearby({fields:['displayName'],locationRestriction:{center:{lat,lng:lon},radius:200},maxResultCount:1,language:'zh-TW'});
+    if(out&&out.places&&out.places[0])place=out.places[0].displayName||'';}}catch(e){}
+  if(!place)place=comp('point_of_interest')||comp('establishment')||comp('sublocality_level_1')||comp('neighborhood')||comp('locality');
+  return{place,city:comp('locality')||comp('administrative_area_level_2')||comp('administrative_area_level_1'),country:comp('country')};
+}
+async function googleForward(q){const gm=await loadGoogle();const r=await new gm.Geocoder().geocode({address:q,language:'zh-TW'});const x=r&&r.results&&r.results[0];
+  if(!x)return null;const comp=t=>{const c=x.address_components.find(c=>c.types.includes(t));return c?c.long_name:'';};
+  return{lat:x.geometry.location.lat(),lon:x.geometry.location.lng(),city:comp('locality')||comp('administrative_area_level_1'),country:comp('country')};}
+async function aiReverse(list){
+  const r=await sampleFn.json('以下是旅遊影片拍攝時的 GPS 座標（緯度,經度），依序編號。請判斷每個座標所在的國家、城市，以及最可能的景點或地區名稱，全部用繁體中文（台灣用語）。只回傳 JSON 陣列，順序與輸入相同，每筆格式為 {"country":"日本","city":"京都","place":"嵐山竹林"}。\n'+list.map((c,i)=>(i+1)+'. '+c.lat.toFixed(5)+','+c.lon.toFixed(5)).join('\n'),{modelTier:'default'});
+  return Array.isArray(r)?r:null;}
+async function aiForward(q,ctxt){const r=await sampleFn.json('請找出這個旅遊地點的大約座標。地點：「'+q+'」'+(ctxt?'，大致在：'+ctxt:'')+'。只回傳 JSON，格式 {"lat":緯度數字,"lon":經度數字,"city":"城市（繁體中文）","country":"國家（繁體中文）","found":true}；如果無法確定是哪裡，回傳 {"found":false}。',{modelTier:'default'});
+  return r&&r.found!==false&&isFinite(+r.lat)&&isFinite(+r.lon)?{lat:+r.lat,lon:+r.lon,city:r.city||'',country:r.country||''}:null;}
+async function freeReverse(lat,lon){const r=await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+lat+'&longitude='+lon+'&localityLanguage=zh-Hant');const j=await r.json();
+  return{country:j.countryName||'',city:j.city||j.principalSubdivision||'',place:j.locality||''};}
+async function freeForward(q){const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=zh-TW&q='+encodeURIComponent(q));const j=await r.json();
+  return j&&j[0]?{lat:+j[0].lat,lon:+j[0].lon,city:'',country:''}:null;}
+async function reverseOne(c){
+  if(canGoogle()){try{const r=await googleReverse(c.lat,c.lon);if(r&&(r.place||r.city))return Object.assign(r,{src:'google'});}catch(e){}}
+  if(sampleFn){try{const r=await aiReverse([c]);if(r&&r[0])return Object.assign(r[0],{src:'ai'});}catch(e){if(e&&(e.code==='not_granted'||e.code==='sampling_disabled')){sampleFn=null;refreshCaps();}}}
+  try{const r=await freeReverse(c.lat,c.lon);if(r&&(r.place||r.city))return Object.assign(r,{src:'free'});}catch(e){}
+  return null;}
+async function forwardOne(q){
+  const ctxt=[S.cities,S.country].filter(Boolean).join('、');const full=[q,ctxt].filter(Boolean).join(' ');
+  if(canGoogle()){try{const r=await googleForward(full);if(r)return r;}catch(e){}}
+  if(sampleFn){try{const r=await aiForward(q,ctxt);if(r)return r;}catch(e){}}
+  try{return await freeForward(full);}catch(e){}
+  return null;}
+function applyPlace(c,r){if(!r)return;if(r.place)c.place=String(r.place).slice(0,40);if(r.city)c.city=String(r.city);if(r.country)c.country=String(r.country);c.placeSrc=r.src||c.placeSrc;}
+function refreshTripNames(){const countries=[...new Set(S.clips.map(c=>c.country).filter(Boolean))],cities=[...new Set(S.clips.map(c=>c.city).filter(Boolean))];
+  if(countries.length)S.country=countries.join('、');if(cities.length)S.cities=cities.join('、');}
+function rerenderPlaces(){renderStep1();renderStep2();renderModeNote();}
+function getHere(){return new Promise((res,rej)=>{if(!navigator.geolocation){rej(new Error('none'));return;}navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lon:p.coords.longitude}),rej,{enableHighAccuracy:true,timeout:12000,maximumAge:60000});});}
+async function autoLocate(id){
+  const c=S.clips.find(x=>x.id===id);if(!c)return;
+  document.querySelectorAll('[data-action="loc-auto"][data-id="'+id+'"]').forEach(b=>{b.disabled=true;b.textContent='定位中…';});
+  const say=t=>document.querySelectorAll('[data-locsrc="'+id+'"]').forEach(el=>{el.textContent=t;});
+  try{
+    if(c.lat==null||c.manualGeo){
+      try{const p=await getHere();c.lat=p.lat;c.lon=p.lon;c.manualGeo=false;c.hereGeo=true;}
+      catch(e){say(window.claude?'在 Claude 頁面中無法取得目前位置，請自由填寫，或放到自己的網站後再使用。':'無法取得目前位置，請允許定位權限，或直接填寫地點。');return;}
+    }
+    say('查詢地名中…');
+    const r=await reverseOne(c);
+    if(!r){say('目前查不到地名，請直接填寫。');return;}
+    applyPlace(c,r);if(c.hereGeo)c.placeSrc='here';refreshTripNames();rerenderPlaces();
+  }finally{document.querySelectorAll('[data-action="loc-auto"][data-id="'+id+'"]').forEach(b=>{b.disabled=false;b.textContent=c.lat!=null&&!c.manualGeo?'自動定位':'用目前位置';});}
+}
+function updateLocSrc(c){document.querySelectorAll('[data-locsrc="'+c.id+'"]').forEach(el=>{el.textContent=locSrcText(c);el.classList.toggle('ok',!!(c.placeSrc&&c.placeSrc!=='manual'||c.manualGeo));});}
+async function manualPlace(c){
+  c.placeSrc='manual';const q=(c.place||'').trim();
+  if(!q||(c.lat!=null&&!c.manualGeo)){updateLocSrc(c);return;}
+  const wasManual=c.manualGeo;c.geoSeq=(c.geoSeq||0)+1;const tag=c.geoSeq;
+  document.querySelectorAll('[data-locsrc="'+c.id+'"]').forEach(el=>{el.textContent='手動填寫，正在地圖上找這個地點…';});
+  const r=await forwardOne(q);
+  if(c.geoSeq!==tag||(c.place||'').trim()!==q)return;
+  if(r){c.lat=r.lat;c.lon=r.lon;c.manualGeo=true;if(r.city&&!c.city)c.city=r.city;if(r.country&&!c.country)c.country=r.country;refreshTripNames();}
+  else if(wasManual){c.lat=null;c.lon=null;c.manualGeo=false;}
+  document.querySelectorAll('[data-locsrc="'+c.id+'"]').forEach(el=>{el.textContent=r?'手動填寫，已在足跡地圖上找到這個地點':'手動填寫（地圖上找不到這個地點，足跡會依順序示意）';el.classList.toggle('ok',!!r);});
+}
+async function geoNames(){
+  const targets=S.clips.filter(c=>c.lat!=null&&!c.manualGeo);if(!targets.length)return;
+  const btn=$('#geoBtn');btn.disabled=true;setStatus('#geoStatus','自動填寫地名中…');
+  let done=0,src='';
+  if(canGoogle()){for(const c of targets){try{const r=await googleReverse(c.lat,c.lon);if(r&&(r.place||r.city)){applyPlace(c,Object.assign(r,{src:'google'}));done++;}}catch(e){break;}}if(done)src='Google 地圖';}
+  if(!done&&sampleFn){try{const r=await aiReverse(targets);if(r){targets.forEach((c,k)=>{if(r[k]){applyPlace(c,Object.assign({},r[k],{src:'ai'}));done++;}});src='AI';}}catch(e){if(e&&(e.code==='not_granted'||e.code==='sampling_disabled')){sampleFn=null;refreshCaps();}}}
+  if(!done){for(const c of targets){try{const r=await freeReverse(c.lat,c.lon);if(r&&(r.place||r.city)){applyPlace(c,Object.assign(r,{src:'free'}));done++;}}catch(e){break;}}if(done)src='免費地名服務';}
+  btn.disabled=false;
+  if(!done){setStatus('#geoStatus','目前無法自動填寫地名，請在下方自由填寫。',true);return;}
+  refreshTripNames();setStatus('#geoStatus','已用'+src+'填入 '+done+' 段影片的地名，請確認是否正確。');rerenderPlaces();
+}
+function wmo(code){if(code===0)return'晴';if(code<=2)return'晴時多雲';if(code===3)return'陰';if(code===45||code===48)return'霧';if(code>=51&&code<=57)return'小雨';
+  if(code===61)return'小雨';if(code>=63&&code<=67)return'雨';if(code>=71&&code<=77)return'雪';if(code>=80&&code<=82)return'陣雨';if(code>=85&&code<=86)return'雪';if(code>=95)return'雷雨';return'多雲';}
+async function fetchWeather(){
+  const days=tripDays();const btn=$('#wxBtn');btn.disabled=true;setStatus('#wxStatus','查詢天氣中…');let ok=0,fail=0;
+  for(const day of days){const c=S.clips.find(x=>x.date===day&&x.lat!=null)||S.clips.find(x=>x.lat!=null);if(!c)continue;
+    const q='latitude='+c.lat.toFixed(4)+'&longitude='+c.lon.toFixed(4)+'&start_date='+day+'&end_date='+day+'&daily=weather_code,temperature_2m_max&timezone=auto';
+    let got=false;
+    for(const base of['https://archive-api.open-meteo.com/v1/archive?','https://api.open-meteo.com/v1/forecast?']){
+      try{const r=await fetch(base+q);if(!r.ok)continue;const j=await r.json();const code=j.daily&&j.daily.weather_code&&j.daily.weather_code[0];const tmax=j.daily&&j.daily.temperature_2m_max&&j.daily.temperature_2m_max[0];
+        if(code==null||tmax==null)continue;S.weather[day]={cond:wmo(code),temp:Math.round(tmax)};got=true;break;}catch(e){}}
+    got?ok++:fail++;}
+  btn.disabled=false;renderStep2();
+  setStatus('#wxStatus',ok?'已填入 '+ok+' 天的天氣（白天最高溫）。'+(fail?'有 '+fail+' 天查不到，請手動選擇。':''):'這裡無法連線查天氣，請手動選擇。放到自己的網站上就能自動查詢。',!ok);
+}
+let aiCtl=null;
+function targetsForWriting(){const blank=S.clips.filter(c=>!(c.note||'').trim());return blank.length?blank:S.clips.slice();}
+async function aiDesc(){
+  if(!sampleFn||aiCtl||!S.clips.length)return;
+  const targets=targetsForWriting();
+  aiCtl=new AbortController();$('#aiDescBtn').disabled=true;$('#stopAiBtn').hidden=false;setStatus('#descStatus','AI 撰寫中…（'+targets.length+' 段）');
+  const lines=targets.map((c,i)=>{const w=S.weather[c.date];return (i+1)+'. '+c.date+' '+(c.time||'')+' '+(c.place||'（地點未填）')+(c.city?'，'+c.city:'')+(w&&w.cond?'，天氣'+w.cond+(w.temp!=null&&w.temp!==''?' '+w.temp+'°C':''):'');}).join('\n');
+  const prompt='請為旅遊影片的 '+targets.length+' 段片段各寫一句心情短文，依序對應下面的片段。用繁體中文（台灣用語），每句 14 到 26 個字，語氣'+VSTYLE[S.style].tone+'，像旅人當下的心情，自然口語。不要使用表情符號，不要加入沒提供的人名，每句以「。」結尾。只回傳 JSON 字串陣列，長度為 '+targets.length+'。\n國家／城市：'+(placeTitle()||'未填')+'\n旅伴：'+(S.companions.join('、')||'一個人')+'\n整體心情：'+(S.moods.join('、')||'未填')+'\n片段：\n'+lines;
+  try{const r=await sampleFn.json(prompt,{signal:aiCtl.signal,cache:false});
+    if(!Array.isArray(r))throw {code:'invalid_json'};
+    targets.forEach((c,i)=>{if(r[i]!=null)c.note=String(r[i]).trim().slice(0,60);});
+    renderNotes();renderStep1();setStatus('#descStatus','已寫好 '+targets.length+' 段，可以直接修改。');}
+  catch(e){const msg={cancelled:'已停止。',not_granted:'沒有開放 AI 功能，可以改用範本或自己寫。',rate_limited:'使用太頻繁，請稍後再試。',refused:'AI 無法處理這段內容，請改用範本。',invalid_json:'AI 回覆的格式不對，請再按一次。'}[e&&e.code]||'AI 暫時無法回應，請稍後再試或改用範本。';
+    setStatus('#descStatus',msg,e&&e.code!=='cancelled');if(e&&(e.code==='not_granted'||e.code==='sampling_disabled')){sampleFn=null;refreshCaps();}}
+  aiCtl=null;$('#aiDescBtn').disabled=false;$('#stopAiBtn').hidden=true;
+}
+function tplDesc(){
+  if(!S.clips.length)return;
+  const targets=new Set(targetsForWriting());
+  const who=S.companions.length?'和'+S.companions.join('、'):'一個人';
+  S.clips.forEach((c,i)=>{if(!targets.has(c))return;const w=S.weather[c.date];const pl=c.place||c.city||'這裡';
+    const wx=w&&w.cond?(w.cond.includes('雨')?'下著'+w.cond+'的':w.cond+'天的'):'';
+    if(i===0)c.note=who+'出發，第一站是'+wx+pl+'。';
+    else if(i===S.clips.length-1)c.note='最後在'+pl+'，'+(S.moods[0]?'帶著滿滿的'+S.moods[0]:'把回憶收好')+'回家。';
+    else c.note=wx+pl+'，'+(['慢慢走、慢慢看','每一步都想記下來','停下來拍了好多照片','留下了好多笑聲'][i%4])+'。';});
+  renderNotes();renderStep1();setStatus('#descStatus','已產生 '+targets.size+' 段範本，可以再自己修改。');
+}
+function refreshCaps(){$('#aiDescBtn').hidden=!sampleFn;if($('#genAiBtn'))$('#genAiBtn').hidden=!sampleFn;}
+
+/* ---------- events ---------- */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action;
+  if(a==='goto')setStep(+b.dataset.step);
+  else if(a==='prev')setStep(S.step-1);
+  else if(a==='next')setStep(S.step+1);
+  else if(a==='demo')loadDemo();
+  else if(a==='remove'){const c=S.clips.find(x=>x.id===+b.dataset.id);if(c&&c.url)URL.revokeObjectURL(c.url);S.clips=S.clips.filter(x=>x.id!==+b.dataset.id);
+    const keep=new Set(tripDays());Object.keys(S.weather).forEach(k=>{if(!keep.has(k))delete S.weather[k];});renderAll();}
+  else if(a==='up'||a==='down'){const i=S.clips.findIndex(x=>x.id===+b.dataset.id);moveClip(i,i+(a==='up'?-1:1));
+    const nb=document.querySelector('[data-action="'+a+'"][data-id="'+b.dataset.id+'"]');(nb&&!nb.disabled?nb:document.querySelector('[data-action="'+(a==='up'?'down':'up')+'"][data-id="'+b.dataset.id+'"]'))?.focus();}
+  else if(a==='sort-time'){S.clips.sort((x,y)=>x.ts-y.ts);S.manual=false;setStatus('#orderStatus','已改回依拍攝時間排序。');renderAll();}
+  else if(a==='edit-toggle'){ED.on=!ED.on;if(ED.on&&ED.seg<0)ED.seg=1;renderEditor();if(!ED.on)drawStill();}
+  else if(a==='ed-seg'){ED.seg=+b.dataset.i;ED.key=null;setStatus('#edStatus','');renderEditor();}
+  else if(a==='ed-item'){ED.key=b.dataset.k;setStatus('#edStatus','');renderEditor();}
+  else if(a==='ed-color'){edSet({color:b.dataset.c});renderEditor();}
+  else if(a==='ed-font')edFont(b.dataset.f);
+  else if(a==='nudge'){const o=segOv(ED.cur)[ED.key]||{};edSet({dx:(o.dx||0)+(+b.dataset.dx),dy:(o.dy||0)+(+b.dataset.dy)});}
+  else if(a==='ed-repos'){edSet({dx:0,dy:0});setStatus('#edStatus','位置已重設。');}
+  else if(a==='ed-hide'){const o=segOv(ED.cur)[ED.key]||{};edSet({hidden:!o.hidden});renderEditor();setStatus('#edStatus',o.hidden?'已重新顯示。':'已刪除這段文字，可以按「顯示這段文字」復原。');}
+  else if(a==='ed-reset'){const ov=segOv(ED.cur);delete ov[ED.key];renderEditor();setStatus('#edStatus','已還原成原本的樣子。');}
+  else if(a==='ed-all'){const src=segOv(ED.cur)[ED.key]||{};const pick={};['color','scale','font','dx','dy'].forEach(k=>{if(src[k]!=null)pick[k]=src[k];});
+    S.clips.forEach(c=>{c.ov=c.ov||{};c.ov[ED.key]=Object.assign({},c.ov[ED.key]||{},pick);});drawEditor();setStatus('#edStatus','已把「'+LABELS[ED.key]+'」的顏色、大小、字型和位置套用到所有片段。');}
+  else if(a==='len-all'){const n=+b.dataset.v;setAllLen(n);setStatus('#lenStatus',S.clips.length?'所有影片都改成剪 '+n+' 秒，已重新挑選最精彩的片段。':'之後上傳的影片會剪 '+n+' 秒。');renderStep1();renderStep5();}
+  else if(a==='m-mode'){S.music.mode=b.dataset.v;musicChanged();}
+  else if(a==='m-preset'){S.music.preset=b.dataset.v;musicChanged();}
+  else if(a==='g-mood'){S.music.gen.mood=b.dataset.v;S.music.gen.ai=null;setStatus('#genStatus','');musicChanged();}
+  else if(a==='g-inst'){S.music.gen.inst=b.dataset.v;S.music.gen.ai=null;setStatus('#genStatus','');musicChanged();}
+  else if(a==='gen-new'){S.music.gen.seed++;if(S.music.gen.ai)S.music.gen.ai=Object.assign({},S.music.gen.ai);setStatus('#genStatus','已換一段新的旋律和調性，按試聽聽聽看。');musicChanged();}
+  else if(a==='gen-ai')aiCompose();
+  else if(a==='m-play')toggleAudition();
+  else if(a==='loc-auto')autoLocate(+b.dataset.id);
+  else if(a==='geo')geoNames();
+  else if(a==='weather')fetchWeather();
+  else if(a==='mood'){const v=b.dataset.v;S.moods=S.moods.includes(v)?S.moods.filter(x=>x!==v):S.moods.concat(v);renderStep3();}
+  else if(a==='comp-add')addComp();
+  else if(a==='comp-del'){S.companions.splice(+b.dataset.i,1);renderStep3();}
+  else if(a==='style'){S.style=b.dataset.v;renderStyleGrid();renderStep3();setStatus('#lenStatus','已換成「'+S.style+'」風格，第 5 步可以預覽效果。');const nb=document.querySelector('[data-action="style"][data-v="'+S.style+'"]');if(nb)nb.focus();}
+  else if(a==='ai-desc')aiDesc();
+  else if(a==='stop-ai'){if(aiCtl)aiCtl.abort();}
+  else if(a==='tpl-desc')tplDesc();
+  else if(a==='mover'){S.mover=b.dataset.v;renderStep4();}
+  else if(a==='preview')runTimeline(false);
+  else if(a==='render')runTimeline(true);
+  else if(a==='stop'){if(run)run.stop=true;}
+  else if(a==='save')saveResult();
+});
+function moveClip(from,to){
+  if(from<0||to<0||from>=S.clips.length||to>=S.clips.length||from===to)return;
+  const c=S.clips.splice(from,1)[0];S.clips.splice(to,0,c);
+  S.manual=true;renderAll();
+  setStatus('#orderStatus','「'+(c.place||'未命名地點')+'」移到第 '+(to+1)+' 段。'+'它的心情短文也一起移動了。');
+}
+/* drag to reorder (touch and mouse) */
+(function(){
+  let drag=null;
+  const list=$('#clipList');
+  list.addEventListener('pointerdown',e=>{
+    const h=e.target.closest('[data-handle]');if(!h||run)return;
+    const card=h.closest('.clip');const cards=[...list.querySelectorAll('.clip')];
+    drag={card,id:+h.dataset.handle,from:cards.indexOf(card),startY:e.clientY,cards,rects:cards.map(c=>c.getBoundingClientRect()),to:cards.indexOf(card),pid:e.pointerId};
+    card.classList.add('dragging');list.classList.add('sorting');h.setPointerCapture(e.pointerId);e.preventDefault();
+  });
+  list.addEventListener('pointermove',e=>{
+    if(!drag||e.pointerId!==drag.pid)return;
+    const dy=e.clientY-drag.startY;drag.card.style.transform='translateY('+dy+'px)';
+    const r=drag.rects[drag.from],mid=r.top+r.height/2+dy;let to=0;
+    drag.rects.forEach((q,i)=>{if(i!==drag.from&&mid>q.top+q.height/2)to++;});
+    if(to>drag.from)to=Math.min(to,drag.cards.length-1);drag.to=to;
+    const h=r.height+10;
+    drag.cards.forEach((c,i)=>{if(i===drag.from)return;let s=0;if(drag.from<to&&i>drag.from&&i<=to)s=-h;if(drag.from>to&&i<drag.from&&i>=to)s=h;c.style.transform=s?'translateY('+s+'px)':'';});
+    if(e.clientY<60)window.scrollBy(0,-10);else if(e.clientY>window.innerHeight-120)window.scrollBy(0,10);
+  });
+  const end=e=>{if(!drag||e.pointerId!==drag.pid)return;const d=drag;drag=null;
+    d.cards.forEach(c=>{c.style.transform='';});d.card.classList.remove('dragging');list.classList.remove('sorting');
+    if(d.to!==d.from)moveClip(d.from,d.to);};
+  list.addEventListener('pointerup',end);list.addEventListener('pointercancel',end);
+})();
+function addComp(){const i=$('#compInput');const v=i.value.trim();if(!v)return;v.split(/[、,，\s]+/).filter(Boolean).forEach(n=>{if(!S.companions.includes(n))S.companions.push(n);});i.value='';renderStep3();i.focus();}
+$('#compInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();addComp();}});
+$('#file').addEventListener('change',e=>{const f=e.target.files;if(f&&f.length)addFiles(f).then(()=>{e.target.value='';});});
+document.addEventListener('input',e=>{const t=e.target;
+  if(t.id==='country')S.country=t.value;
+  else if(t.id==='cities')S.cities=t.value;
+  else if(t.dataset.noteId){const c=S.clips.find(x=>x.id===+t.dataset.noteId);if(c)c.note=t.value;}
+  else if(t.dataset.placeId){const c=S.clips.find(x=>x.id===+t.dataset.placeId);if(c){c.place=t.value;c.placeSrc='manual';
+    document.querySelectorAll('[data-place-id="'+c.id+'"]').forEach(x=>{if(x!==t)x.value=t.value;});
+    const card=document.querySelector('.clip[data-id="'+c.id+'"] strong');if(card)card.textContent=t.value||'未命名地點';}}
+  else if(t.id==='gKey'){gKey=t.value.trim();gReady=null;try{if(gKey)localStorage.setItem('tv_gkey',gKey);else localStorage.removeItem('tv_gkey');}catch(e){}}
+  else if(t.dataset.wxDay){const d=t.dataset.wxDay;S.weather[d]=S.weather[d]||{};if(t.dataset.f==='cond')S.weather[d].cond=t.value;else S.weather[d].temp=t.value===''?null:Math.round(+t.value);}
+});
+document.addEventListener('change',e=>{const t=e.target;
+  if(t.dataset&&t.dataset.lenId){const c=S.clips.find(x=>x.id===+t.dataset.lenId);if(c){c.segLen=+t.value;pickWindow(c);renderStep1();renderStep5();
+    setStatus('#orderStatus','「'+(c.place||'未命名地點')+'」改成剪 '+(Math.round(c.segDur*10)/10)+' 秒，精彩片段 '+fmtDur(c.hlStart)+'–'+fmtDur(c.hlStart+c.segDur)+'。');
+    const sel=document.querySelector('[data-len-id="'+c.id+'"]');if(sel)sel.focus();}}if(t.dataset&&t.dataset.wxDay&&t.dataset.f==='cond'){const d=t.dataset.wxDay;S.weather[d]=S.weather[d]||{};S.weather[d].cond=t.value;}
+  if(t.dataset&&t.dataset.placeId){const c=S.clips.find(x=>x.id===+t.dataset.placeId);if(c)manualPlace(c);}});
+
+/* ---------- start ---------- */
+loadDemo();setStep(1);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(S.step===5)drawStill();});
+(async()=>{if(!window.claude||!window.claude.use)return;
+  try{sampleFn=await window.claude.use('sample');}catch(e){sampleFn=null;}
+  try{dl=await window.claude.use('downloads');}catch(e){dl=null;}
+  refreshCaps();})();
+})();
+</script>
+
+<div id="installTip" hidden role="dialog" aria-label="安裝到手機">
+  <img src="apple-touch-icon.png" alt="">
+  <p id="installText"></p>
+  <button class="go" type="button" id="installGo" hidden>安裝</button>
+  <button class="x" type="button" id="installX" aria-label="關閉">稍後</button>
+</div>
+<script>
+(function(){
+  if('serviceWorker' in navigator&&location.protocol==='https:'){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  if(standalone)return;
+  let dismissed=false;try{dismissed=localStorage.getItem('tv_install_x')==='1';}catch(e){}
+  if(dismissed)return;
+  const tip=document.getElementById('installTip'),txt=document.getElementById('installText'),go=document.getElementById('installGo');
+  const close=()=>{tip.hidden=true;try{localStorage.setItem('tv_install_x','1');}catch(e){}};
+  document.getElementById('installX').addEventListener('click',close);
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  let deferred=null;
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;txt.textContent='把「旅遊影片」安裝到手機桌面，用起來就像一般 App。';go.hidden=false;tip.hidden=false;});
+  go.addEventListener('click',async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice;}catch(e){}deferred=null;close();});
+  if(ios){setTimeout(()=>{txt.textContent='安裝到主畫面：按 Safari 下方的「分享」，再選「加入主畫面」。';tip.hidden=false;},1500);}
+})();
+</script>
+</body>
+</html>
