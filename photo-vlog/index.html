@@ -324,7 +324,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px}
       <div class="row"><button class="btn red grow" id="mapRec" type="button">輸出足跡動畫影片</button><button class="btn grow" id="mapPng" type="button">存成足跡地圖圖片</button></div>
       <div class="bar" aria-hidden="true"><i id="mapBar"></i></div>
       <p class="hint" id="mapExpNote">只輸出片尾的足跡地圖：影片含小人物走完全程的動畫，圖片是最後完整路線的畫面。</p>
-      <div class="result" id="mapResult" hidden><video id="mapVid" controls playsinline></video><div class="row" style="margin-top:8px"><button class="btn primary" id="mapDl" type="button">下載足跡影片</button><span class="hint" id="mapDlNote"></span></div></div>
+      <div class="result" id="mapResult" hidden><video id="mapVid" controls playsinline></video><div class="row" style="margin-top:8px"><button class="btn primary" id="mapDl" type="button">下載足跡影片</button><span class="hint" id="mapDlNote"></span></div><p class="hint" id="mapSaveHint" hidden></p></div>
       <ul class="route" id="routeList"></ul>
     </div>
     <div class="nextrow"><button class="btn" data-go="style">← 風格</button><button class="btn primary" data-go="out">下一步：預覽輸出 →</button></div>
@@ -342,7 +342,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px}
       <div class="result" id="result" hidden>
         <video id="outVid" controls playsinline></video>
         <div class="row" style="margin-top:8px"><button type="button" class="btn primary" id="dlBtn">下載影片</button><span class="hint" id="dlNote"></span></div>
-        <p class="hint">iPhone：存好後在「檔案」App 或分享選單裡選「儲存影片」，就會放進「照片」。</p>
+        <p class="hint" id="saveHint">電腦：影片會存到「下載」資料夾。</p>
       </div>
     </div>
     <div class="nextrow"><button class="btn" data-go="map">← 足跡</button><span></span></div>
@@ -1336,10 +1336,37 @@ $('#scrub').oninput=e=>{ if(recording) return; stop(); curT=+e.target.value; dra
 let lastOut=null, mapRecording=false, mapOut=null;
 const safeName=()=>(state.title||'vlog').replace(/[\\/:*?"<>|]/g,'').trim()||'vlog';
 const pickMime=()=>['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';
+const IS_IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const IS_MOBILE=IS_IOS||/Android/i.test(navigator.userAgent);
+function shareFileOf(blob,name){
+  try{ const type=blob.type||(/\.png$/i.test(name)?'image/png':'video/mp4'); const f=new File([blob],name,{type});
+    return navigator.share&&navigator.canShare&&navigator.canShare({files:[f]})?f:null; }catch(e){ return null; }
+}
+const USE_SHARE=IS_MOBILE&&!!shareFileOf(new Blob([''],{type:'video/mp4'}),'test.mp4');
+// Returns 'retry' when the phone needs one more tap before it will open the share sheet.
 async function saveBlob(blob,name,note){
-  let dl=null; try{ dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; }catch(e){}
-  if(dl){ try{ await dl.save({filename:name,data:blob}); note.textContent='已存檔'; }catch(e){ note.textContent = e&&e.code==='declined' ? '已取消' : '無法存檔，請稍後再試'; } return; }
+  if(window.claude&&window.claude.use){
+    let dl=null; try{ dl=await window.claude.use('downloads'); }catch(e){}
+    if(dl){ try{ await dl.save({filename:name,data:blob}); note.textContent='已存檔'; }catch(e){ note.textContent = e&&e.code==='declined' ? '已取消' : '無法存檔，請稍後再試'; } return; }
+  }
+  const isImg=/\.png$/i.test(name);
+  const f=USE_SHARE?shareFileOf(blob,name):null;
+  if(f){
+    try{ await navigator.share({files:[f]}); note.textContent='完成'; return; }
+    catch(e){
+      if(e&&e.name==='AbortError'){ note.textContent='已取消'; return; }
+      if(e&&e.name==='NotAllowedError'){ note.textContent=isImg?'圖片已準備好，請再按一次按鈕儲存。':'請再按一次按鈕儲存。'; return 'retry'; }
+    }
+  }
   const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),60000); note.textContent='已開始下載';
+}
+if(USE_SHARE){
+  $('#dlBtn').textContent='儲存到照片'; $('#mapDl').textContent='儲存足跡影片到照片';
+  const h=IS_IOS?'按下後會開啟分享選單，點「儲存影片」就會存進「照片」。':'按下後會開啟分享選單，選擇相簿或雲端硬碟即可儲存。';
+  $('#saveHint').textContent=h; $('#mapSaveHint').textContent=h; $('#mapSaveHint').hidden=false;
+} else if(IS_IOS){
+  const h='影片會存進「檔案」App，打開後點分享，再選「儲存影片」就會放進「照片」。';
+  $('#saveHint').textContent=h; $('#mapSaveHint').textContent=h; $('#mapSaveHint').hidden=false;
 }
 $('#dlBtn').onclick=()=>{ if(lastOut) saveBlob(lastOut.blob,lastOut.name,$('#dlNote')); };
 $('#exportBtn').onclick=async()=>{
@@ -1394,11 +1421,15 @@ $('#mapRec').onclick=async()=>{
     if(t<mc.d) mapAnim=requestAnimationFrame(loop); else setTimeout(()=>rec.state!=='inactive'&&rec.stop(),250); };
   mapAnim=requestAnimationFrame(loop);
 };
+let pendingPng=null;
 $('#mapPng').onclick=async()=>{
-  const {clips}=clipsFor(); const mc=clips.find(x=>x.type==='map'); const note=$('#mapExpNote');
+  const note=$('#mapExpNote'), btn=$('#mapPng');
+  if(pendingPng){ const p=pendingPng; pendingPng=null; btn.textContent='存成足跡地圖圖片'; saveBlob(p.blob,p.name,note); return; }
+  const {clips}=clipsFor(); const mc=clips.find(x=>x.type==='map');
   if(!mc){ note.textContent='還沒有含座標的照片，無法產生足跡地圖。'; return; }
   await ensureFonts(); const [W,H]=dims(); work.width=W; work.height=H; renderFrame(wctx,W,H,mc.s+mc.d-0.05,state.style);
-  work.toBlob(b=>{ if(!b){ note.textContent='無法產生圖片'; return; } saveBlob(b,`${safeName()}-足跡地圖.png`,note); },'image/png');
+  work.toBlob(async b=>{ if(!b){ note.textContent='無法產生圖片'; return; } const name=`${safeName()}-足跡地圖.png`;
+    if(await saveBlob(b,name,note)==='retry'){ pendingPng={blob:b,name}; btn.textContent='點這裡儲存圖片'; } },'image/png');
 };
 $('#mapDl').onclick=()=>{ if(mapOut) saveBlob(mapOut.blob,mapOut.name,$('#mapDlNote')); };
 $('#mapPlay').onclick=async()=>{
