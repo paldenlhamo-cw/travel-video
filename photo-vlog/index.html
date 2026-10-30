@@ -80,11 +80,11 @@ input[type=range]{width:100%;accent-color:var(--red)}
 /* boarding pass */
 .pass{display:grid;grid-template-columns:minmax(0,1fr) 96px;background:var(--surface);border-radius:14px;border:1px solid var(--line);overflow:hidden;position:relative}
 .pass-main{padding:14px 16px;display:grid;gap:10px;min-width:0}
-.pass-head{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--blue);font-weight:600}
+.pass-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:2px 10px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--blue);font-weight:600}
 .pass-title{font-family:var(--display);font-size:22px;font-weight:900;line-height:1.25;word-break:break-word}
 .pass-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .pass-grid div{min-width:0}
-.pass-grid small{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted)}
+.pass-grid small{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pass-grid b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pass-stub{border-left:2px dashed var(--line);padding:14px 10px;display:grid;align-content:space-between;justify-items:center;gap:8px;background:var(--paper);position:relative}
 .pass-stub::before,.pass-stub::after{content:"";position:absolute;left:-10px;width:18px;height:18px;border-radius:50%;background:var(--bg);border:1px solid var(--line)}
@@ -196,11 +196,11 @@ details summary{cursor:pointer;font-weight:600;font-size:14px}
   <section class="panel" data-panel="trip">
     <div class="pass" aria-label="Vlog 登機證摘要">
       <div class="pass-main">
-        <div class="pass-head"><span>TRAVEL VLOG · BOARDING PASS</span><span id="passCode">FP-0000</span></div>
+        <div class="pass-head"><span>BOARDING PASS</span><span id="passCode">FP-0000</span></div>
         <div class="pass-title" id="passTitle">—</div>
         <div class="pass-grid">
-          <div><small>DESTINATION</small><b id="passDest">—</b></div>
-          <div><small>DATES</small><b id="passDates">—</b></div>
+          <div><small>TO</small><b id="passDest">—</b></div>
+          <div><small>DATE</small><b id="passDates">—</b></div>
           <div><small>STOPS</small><b id="passStops">0</b></div>
           <div><small>STYLE</small><b id="passStyle">—</b></div>
           <div><small>LENGTH</small><b id="passLen">—</b></div>
